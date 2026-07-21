@@ -19,14 +19,13 @@ This project was engineered over **4.5 months** of rigorous development, utilizi
   <img src="https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white" alt="Expo" />
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/Gemini_AI-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google Gemini" />
 </p>
 
 ## 📅 Development Timeline (4.5 Months)
 - **Month 1:** Architectural design, database schema planning (Supabase), and foundational React Native/Expo setup.
 - **Month 2:** Core tracking features, UI/UX implementation, and robust offline-capable state management.
 - **Month 3:** Development of the Substitution Engine and integration of macro/micro-nutrient optimization algorithms.
-- **Month 4:** Integration of advanced AI features (Gemini), rigorous performance profiling, and bug squashing.
+- **Month 4:** Integration of advanced ML models, rigorous performance profiling, and bug squashing.
 - **Final 2 Weeks:** QA testing, New Architecture (Fabric) migration, and production deployment preparation.
 
 ## 🚀 Distinguishing Factors
@@ -43,7 +42,7 @@ Unlike traditional diet-tracking applications, Nourish stands out through its de
 ## ⚠️ Current Limitations & Future Scope
 - **Offline Mode:** While caching is implemented, robust offline-first synchronization with the backend is still under development.
 - **Dataset Scale:** The current food catalog is highly curated but will require expansion to encompass a global variety of regional cuisines.
-- **AI Personalization:** Currently integrating advanced machine learning (Gemini AI) for even more nuanced, context-aware dietary recommendations based on real-time biometric feedback.
+- **AI Personalization:** Currently integrating advanced machine learning for even more nuanced, context-aware dietary recommendations based on real-time biometric feedback.
 
 ---
 
