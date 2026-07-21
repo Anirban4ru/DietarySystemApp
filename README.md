@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
   <img src="./assets/icon.png" alt="Nourish Logo" width="120" />
   <h1>Nourish - Intelligent Dietary System</h1>
   <p><strong>A Next-Generation Dietary Planning & Optimization Engine</strong></p>
@@ -10,6 +10,24 @@
 Nourish was conceptualized with a core philosophy: **Dietary tracking shouldn't be a mathematical chore.** We believe that an Intelligent Dietary System should not merely count calories—it should actively assist in holistic wellness by learning user patterns, automatically suggesting healthy substitutions, and dynamically optimizing macronutrients based on real-world constraints.
 
 We are shifting the paradigm from *passive tracking* to *active, intelligent optimization*.
+
+## 🛠️ Tech Stack
+This project was engineered over **4.5 months** of rigorous development, utilizing a modern, highly scalable mobile architecture.
+
+<p align="center">
+  <img src="https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React Native" />
+  <img src="https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white" alt="Expo" />
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Gemini_AI-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google Gemini" />
+</p>
+
+## 📅 Development Timeline (4.5 Months)
+- **Month 1:** Architectural design, database schema planning (Supabase), and foundational React Native/Expo setup.
+- **Month 2:** Core tracking features, UI/UX implementation, and robust offline-capable state management.
+- **Month 3:** Development of the Substitution Engine and integration of macro/micro-nutrient optimization algorithms.
+- **Month 4:** Integration of advanced AI features (Gemini), rigorous performance profiling, and bug squashing.
+- **Final 2 Weeks:** QA testing, New Architecture (Fabric) migration, and production deployment preparation.
 
 ## 🚀 Distinguishing Factors
 Unlike traditional diet-tracking applications, Nourish stands out through its deeply integrated intelligent features:
