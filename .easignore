@@ -1,0 +1,11 @@
+# Ignore native directories because we want EAS to always run Prebuild
+# instead of using local dirty/untracked native folders
+android/
+ios/
+
+# other typical ignores
+node_modules/
+.expo/
+dist/
+web-build/
+.git/
