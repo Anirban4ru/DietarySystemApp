@@ -50,6 +50,7 @@ export interface InventoryRow {
 
 export interface ProfileRow {
   id: string;
+  name?: string;
   age: number;
   sex: 'male' | 'female';
   weight_kg: number;

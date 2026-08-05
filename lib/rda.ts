@@ -38,9 +38,9 @@ export function computeTDEE(p: ProfileRow): number {
 export function computeRDA(p: ProfileRow): RDA {
   const tdee = computeTDEE(p);
   const proteinPerKg = p.activity_level === 'sedentary' ? 0.8 : p.activity_level === 'light' ? 1.0 : p.activity_level === 'moderate' ? 1.2 : 1.6;
-  const proteinG = Math.round(p.weight_kg * proteinPerKg);
-  const fatG = Math.round((tdee * 0.3) / 9);
-  const carbG = Math.round((tdee * 0.45) / 4);
+  let proteinG = Math.round(p.weight_kg * proteinPerKg);
+  let fatG = Math.round((tdee * 0.3) / 9);
+  let carbG = Math.round((tdee * 0.45) / 4);
   const fiberG = p.age > 50 ? 28 : 30;
 
   let vitC = p.sex === 'male' ? 90 : 75;
@@ -56,7 +56,10 @@ export function computeRDA(p: ProfileRow): RDA {
     potassium = 4700;
   }
   if (p.conditions.includes('diabetes')) {
-    // lower carb ratio
+    // lower carb ratio to 25%, increase fat to 40%, protein to 35% to weight glycemic impact
+    carbG = Math.round((tdee * 0.25) / 4);
+    fatG = Math.round((tdee * 0.40) / 9);
+    proteinG = Math.round((tdee * 0.35) / 4);
   }
 
   return {

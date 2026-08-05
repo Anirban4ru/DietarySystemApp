@@ -1,12 +1,16 @@
 {
   "expo": {
-    "name": "LogBox",
-    "slug": "logbox",
+    "name": "Nourish",
+    "slug": "nourish",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon.png",
     "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -16,8 +20,15 @@
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "CAMERA",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -28,6 +39,7 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
+      "./disable-lint-plugin.js",
       [
         "expo-camera",
         {
@@ -41,9 +53,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f29ab292-dc50-46b7-9b68-6cc086aa7626"
+        "projectId": "8a00bdd7-d745-48dc-8e1d-affc1834874d"
       }
     },
-    "owner": "anirban4ru"
+    "owner": "anirban4rus-team",
+    "updates": {
+      "url": "https://u.expo.dev/8a00bdd7-d745-48dc-8e1d-affc1834874d"
+    }
   }
 }

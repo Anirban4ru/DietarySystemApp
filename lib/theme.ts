@@ -1,41 +1,44 @@
 import { StyleSheet } from 'react-native';
 
 export const palette = {
-  // Soft backgrounds
-  bone: '#F8F9FA',
-  paper: '#F1F3F5',
-  chalk: '#FFFFFF',
-  ink: '#1A1D20',
-  slate: '#343A40',
-  slate2: '#495057',
-  slate3: '#868E96',
-  mist: '#ADB5BD',
-  mist2: '#CED4DA',
-  hair: '#E9ECEF',
-  hairLight: 'rgba(255,255,255,0.4)',
+  // ── Warm Aristocratic Neutrals ────────────────────────────────
+  bone:         '#FAFAF7',    // Warm ivory — primary bg
+  paper:        '#F2EDE4',    // Aged parchment
+  chalk:        '#FFFFFF',    // Pure white surfaces
+  ink:          '#1C1917',    // Warm charcoal (not cold black)
+  slate:        '#44403C',    // Warm dark gray
+  slate2:       '#78716C',    // Warm stone
+  mist:         '#A8A29E',    // Warm muted
+  mist2:        '#D6D3D1',    // Soft warm gray
+  hair:         '#E7E5E0',    // Warm light border
+  hairLight:    'rgba(255,255,255,0.15)',
 
-  // Professional muted accents
-  sage: '#8FBC8F',
-  sageDeep: '#2E8B57',
-  sageMist: '#E0EEE0',
-  clay: '#D2B48C',
-  clayDeep: '#8B4513',
-  amber: '#F4A460',
-  amberDeep: '#D2691E',
-  crimson: '#CD5C5C',
-  crimsonMist: '#F08080',
+  // ── Signature Forest Greens (fresh herbs, nature) ─────────────
+  sage:         '#3D6B35',    // Forest green
+  sageDeep:     '#1E4D18',    // Deep forest
+  sageMist:     '#EDF5EB',    // Mint tint
 
-  // Semantic
-  success: '#2E8B57',
-  warning: '#D2691E',
-  danger: '#CD5C5C',
+  // ── Saffron / Amber (warmth, spice, richness) ─────────────────
+  clay:         '#C2781A',    // Warm amber
+  clayDeep:     '#92400E',    // Deep amber / burnished copper
+  amber:        '#D97706',    // Saffron gold
+  amberDeep:    '#B45309',    // Rich saffron
 
-  // Dark mode (subtle elegant)
-  darkBg: '#121212',
-  darkSurface: '#1E1E1E',
-  darkBorder: '#2C2C2C',
-  darkText: '#F8F9FA',
-  darkMist: '#ADB5BD',
+  // ── Burgundy / Crimson (sophistication, danger) ───────────────
+  crimson:      '#991B1B',    // Deep burgundy
+  crimsonMist:  '#FEE2E2',    // Soft blush
+
+  // ── Semantic ──────────────────────────────────────────────────
+  success:      '#166534',    // Deep forest green
+  warning:      '#B45309',    // Rich saffron
+  danger:       '#991B1B',    // Burgundy
+
+  // ── Dark mode (Warm espresso depths) ─────────────────────────
+  darkBg:       '#0C0A09',    // Espresso black
+  darkSurface:  '#1C1917',    // Warm charcoal
+  darkBorder:   '#292524',    // Subtle warm dark
+  darkText:     '#FAFAF9',    // Warm white
+  darkMist:     '#A8A29E',    // Warm muted
 } as const;
 
 export type Palette = typeof palette;
@@ -56,39 +59,40 @@ export const spacing = {
 
 export const radius = {
   none: 0,
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  sm:   4,
+  md:   8,
+  lg:   12,
+  xl:   16,
+  xxl:  24,
 } as const;
 
 export const font = {
-  sans: 'Inter-Regular',
-  sansMed: 'Inter-Medium',
-  sansBold: 'Inter-Bold',
-  display: 'SpaceGrotesk-Bold',
-  displayReg: 'SpaceGrotesk-Regular',
+  sans:        'Inter-Regular',
+  sansMed:     'Inter-Medium',
+  sansBold:    'Inter-Bold',
+  display:     'SpaceGrotesk-Bold',
+  displayReg:  'SpaceGrotesk-Regular',
 } as const;
 
 export const type = {
   display: {
     fontFamily: font.display,
-    fontSize: 34,
+    fontSize: 32,
     lineHeight: 38,
     letterSpacing: -0.8,
     fontWeight: '700' as any,
   },
   h1: {
     fontFamily: font.display,
-    fontSize: 26,
+    fontSize: 24,
     lineHeight: 30,
     letterSpacing: -0.5,
     fontWeight: '700' as any,
   },
   h2: {
     fontFamily: font.display,
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 19,
+    lineHeight: 25,
     letterSpacing: -0.3,
     fontWeight: '700' as any,
   },
@@ -102,7 +106,7 @@ export const type = {
   body: {
     fontFamily: font.sans,
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   bodySm: {
     fontFamily: font.sans,
@@ -111,29 +115,33 @@ export const type = {
   },
   label: {
     fontFamily: font.sansBold,
-    fontSize: 10,
-    letterSpacing: 1.8,
+    fontSize: 11,
+    letterSpacing: 1.5,
     textTransform: 'uppercase' as any,
     fontWeight: '700' as any,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   mono: {
     fontFamily: font.sansMed,
     fontSize: 12,
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   monoBold: {
     fontFamily: font.sansBold,
     fontSize: 12,
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     fontWeight: '700' as any,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 } as const;
 
-// Modern subtle border widths
 export const border = {
-  thin: 1,
-  md: 1,
-  thick: 0,
-  heavy: 0,
+  thin:  1,
+  md:    1.5,
+  thick: 2,
+  heavy: 4,
 } as const;
-

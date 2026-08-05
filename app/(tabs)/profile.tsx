@@ -1,21 +1,22 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { User, Check, Sun, Moon } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { User, Check, Sun, Moon, LogOut, Trash2, ChevronDown, ChevronUp, Activity } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { palette, type, spacing, font } from '@/lib/theme';
-import { Label, Pill, Bar, Divider, BrutalButton, GlassPanel, SectionHeader, useTheme } from '@/components/ui';
+import { palette, type, spacing, font, border } from '@/lib/theme';
+import { Bar, Divider, BrutalButton, useTheme } from '@/components/ui';
 import { useProfile, useInventory, useImpact } from '@/lib/hooks';
 import { computeRDA, computeTDEE, bmi, bmiCategory, CONDITION_LABELS } from '@/lib/rda';
 import { Condition } from '@/lib/types';
 import { summarizeImpact } from '@/lib/impact';
+import { supabase } from '@/lib/supabase';
 
-const ACTIVITY_OPTIONS: { value: any; label: string }[] = [
-  { value: 'sedentary', label: 'Not active' },
-  { value: 'light', label: 'Light' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'active', label: 'Active' },
-  { value: 'very_active', label: 'Very active' },
+const ACTIVITY_OPTIONS: { value: any; label: string; emoji: string }[] = [
+  { value: 'sedentary',   label: 'Sedentary',   emoji: '🛋️' },
+  { value: 'light',       label: 'Light',        emoji: '🚶' },
+  { value: 'moderate',    label: 'Moderate',     emoji: '🏃' },
+  { value: 'active',      label: 'Active',       emoji: '⚡' },
+  { value: 'very_active', label: 'Very Active',  emoji: '🔥' },
 ];
 
 const CONDITIONS: Condition[] = ['hypertension', 'diabetes', 'celiac', 'lactose_intolerant'];
@@ -27,15 +28,16 @@ export default function ProfileScreen() {
   const { items } = useInventory();
   const { log } = useImpact();
   const [form, setForm] = useState({
-    age: 30, sex: 'female' as 'male' | 'female', weight_kg: 70, height_cm: 170,
+    name: '', age: 30, sex: 'female' as 'male' | 'female', weight_kg: 70, height_cm: 170,
     activity_level: 'moderate' as any, conditions: [] as Condition[],
   });
   const [saved, setSaved] = useState(false);
+  const [goalsExpanded, setGoalsExpanded] = useState(false);
 
   useMemo(() => {
     if (profile) {
       setForm({
-        age: profile.age, sex: profile.sex, weight_kg: profile.weight_kg,
+        name: profile.name || '', age: profile.age, sex: profile.sex, weight_kg: profile.weight_kg,
         height_cm: profile.height_cm, activity_level: profile.activity_level,
         conditions: profile.conditions,
       });
@@ -54,6 +56,35 @@ export default function ProfileScreen() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleLogout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    await supabase.auth.signOut();
+  };
+
+  const handleDeleteAccount = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account and all data? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Permanently',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.rpc('delete_user');
+              if (error) throw error;
+              await supabase.auth.signOut();
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Could not delete account. Make sure you ran the SQL script.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const toggleCondition = (c: Condition) => {
     Haptics.selectionAsync();
     setForm((f) => ({
@@ -62,202 +93,374 @@ export default function ProfileScreen() {
     }));
   };
 
+  const isDark = mode === 'dark';
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 100 }}>
-        <View style={styles.header}>
-          <Text style={[type.display, { color: colors.text }]}>Profile</Text>
-          <Text style={[type.body, { color: colors.subText }]}>Your nutrition goals are calculated from this</Text>
-          <TouchableOpacity style={[styles.darkToggle, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggle(); }}>
-            {mode === 'dark' ? <Sun size={16} color={colors.text} strokeWidth={2.5} /> : <Moon size={16} color={colors.text} strokeWidth={2.5} />}
-            <Text style={[type.monoBold, { color: colors.text, marginLeft: 6, fontSize: 10 }]}>{mode === 'dark' ? 'LIGHT' : 'DARK'} MODE</Text>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 120, paddingTop: insets.top + 8 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Header ── */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={[styles.screenTitle, { color: colors.text }]}>Profile</Text>
+            <Text style={[styles.screenSub, { color: colors.subText }]}>Personalise your nutrition goals</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.modeToggle, { backgroundColor: isDark ? palette.ink : palette.chalk, borderColor: colors.border }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggle(); }}
+            activeOpacity={0.8}
+          >
+            {isDark
+              ? <Sun size={18} color={palette.chalk} strokeWidth={2.5} />
+              : <Moon size={18} color={palette.ink} strokeWidth={2.5} />}
           </TouchableOpacity>
         </View>
 
-        {/* Quick stats */}
+        {/* ── Stats ── */}
         <View style={styles.statsRow}>
-          <StatBox label="In pantry" value={items.length} color={colors.text} subColor={colors.subText} borderColor={colors.border} bg={colors.surface} />
-          <StatBox label="Meals saved" value={summary.mealsRescued} color={colors.text} subColor={colors.subText} borderColor={colors.border} bg={colors.surface} />
-          <StatBox label="CO2 saved" value={`${summary.totalCo2eAvoided.toFixed(1)}kg`} color={palette.sageDeep} subColor={colors.subText} borderColor={colors.border} bg={colors.surface} />
+          <StatBox label="In Pantry" value={items.length} accent={palette.sageDeep} colors={colors} />
+          <StatBox label="Meals Saved" value={summary.mealsRescued} accent={palette.clayDeep} colors={colors} />
+          <StatBox label="CO₂ Saved" value={`${summary.totalCo2eAvoided.toFixed(1)}kg`} accent={palette.amberDeep} colors={colors} />
         </View>
 
-        {/* About you */}
-        <SectionHeader title="About You" colors={colors} />
-        <GlassPanel style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <View style={styles.row}>
-            <Field label="Age" colors={colors}>
-              <NumInput value={form.age} onChange={(v) => setForm((f) => ({ ...f, age: v }))} colors={colors} />
-            </Field>
-            <Field label="Weight (kg)" colors={colors}>
-              <NumInput value={form.weight_kg} onChange={(v) => setForm((f) => ({ ...f, weight_kg: v }))} colors={colors} />
-            </Field>
-            <Field label="Height (cm)" colors={colors}>
-              <NumInput value={form.height_cm} onChange={(v) => setForm((f) => ({ ...f, height_cm: v }))} colors={colors} />
-            </Field>
+        {/* ── About You ── */}
+        <SectionLabel title="About You" colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {/* Name */}
+          <Text style={[styles.fieldLabel, { color: colors.subText }]}>NAME</Text>
+          <TextInput
+            style={[styles.textInput, { color: colors.text, backgroundColor: colors.bg, borderColor: colors.border }]}
+            value={form.name}
+            onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
+            placeholder="Your name"
+            placeholderTextColor={colors.subText}
+          />
+
+          {/* Age / Weight / Height */}
+          <View style={styles.numRow}>
+            <NumField
+              label="AGE"
+              value={form.age}
+              onChange={(v) => setForm((f) => ({ ...f, age: v }))}
+              colors={colors}
+            />
+            <NumField
+              label="WEIGHT (KG)"
+              value={form.weight_kg}
+              onChange={(v) => setForm((f) => ({ ...f, weight_kg: v }))}
+              colors={colors}
+            />
+            <NumField
+              label="HEIGHT (CM)"
+              value={form.height_cm}
+              onChange={(v) => setForm((f) => ({ ...f, height_cm: v }))}
+              colors={colors}
+            />
           </View>
 
-          <Text style={[type.body, { color: colors.subText, marginTop: spacing[4] }]}>Sex</Text>
-          <View style={styles.segmentRow}>
-            {(['female', 'male'] as const).map((s) => (
-              <TouchableOpacity
-                key={s}
-                style={[styles.segment, { borderColor: colors.border }, form.sex === s && { backgroundColor: palette.sageDeep, borderColor: palette.sageDeep }]}
-                onPress={() => { Haptics.selectionAsync(); setForm((f) => ({ ...f, sex: s })); }}
-              >
-                <Text style={[type.body, { color: form.sex === s ? palette.chalk : colors.text, textTransform: 'capitalize', fontFamily: font.sansBold }]}>{s}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Sex */}
+          <Text style={[styles.fieldLabel, { color: colors.subText, marginTop: 16 }]}>SEX</Text>
+          <View style={styles.segRow}>
+            {(['female', 'male'] as const).map((s) => {
+              const active = form.sex === s;
+              return (
+                <TouchableOpacity
+                  key={s}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.segChip,
+                    {
+                      backgroundColor: active ? palette.sageDeep : colors.bg,
+                      borderColor: active ? palette.sageDeep : colors.border,
+                    },
+                  ]}
+                  onPress={() => { Haptics.selectionAsync(); setForm((f) => ({ ...f, sex: s })); }}
+                >
+                  <Text style={[styles.segText, { color: active ? palette.chalk : colors.text }]}>
+                    {s === 'female' ? '♀ Female' : '♂ Male'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        </GlassPanel>
+        </View>
 
-        {/* Activity */}
-        <SectionHeader title="Activity Level" colors={colors} />
-        <GlassPanel style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        {/* ── Activity Level ── */}
+        <SectionLabel title="Activity Level" colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.activityGrid}>
-            {ACTIVITY_OPTIONS.map((a) => (
-              <TouchableOpacity
-                key={a.value}
-                style={[styles.activityCell, { borderColor: colors.border }, form.activity_level === a.value && { backgroundColor: palette.sageDeep, borderColor: palette.sageDeep }]}
-                onPress={() => { Haptics.selectionAsync(); setForm((f) => ({ ...f, activity_level: a.value })); }}
-              >
-                <Text style={[type.bodySm, { color: form.activity_level === a.value ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>{a.label}</Text>
-              </TouchableOpacity>
-            ))}
+            {ACTIVITY_OPTIONS.map((a) => {
+              const active = form.activity_level === a.value;
+              return (
+                <TouchableOpacity
+                  key={a.value}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.activityChip,
+                    {
+                      backgroundColor: active ? palette.ink : colors.bg,
+                      borderColor: active ? palette.ink : colors.border,
+                    },
+                  ]}
+                  onPress={() => { Haptics.selectionAsync(); setForm((f) => ({ ...f, activity_level: a.value })); }}
+                >
+                  <Text style={styles.activityEmoji}>{a.emoji}</Text>
+                  <Text style={[styles.activityText, { color: active ? palette.chalk : colors.text }]}>{a.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        </GlassPanel>
+        </View>
 
-        {/* Health conditions */}
-        <SectionHeader title="Health Conditions" subtitle="Recipes auto-swap ingredients that don't fit" colors={colors} />
-        <GlassPanel style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        {/* ── Health Conditions ── */}
+        <SectionLabel title="Health Conditions" subtitle="Recipes will auto-swap unsafe ingredients" colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.condGrid}>
             {CONDITIONS.map((c) => {
               const active = form.conditions.includes(c);
               return (
                 <TouchableOpacity
                   key={c}
-                  style={[styles.condChip, { borderColor: active ? palette.sageDeep : colors.border, backgroundColor: active ? palette.sageMist : colors.bg }]}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.condChip,
+                    {
+                      backgroundColor: active ? palette.sageDeep : colors.bg,
+                      borderColor: active ? palette.sageDeep : colors.border,
+                    },
+                  ]}
                   onPress={() => toggleCondition(c)}
                 >
-                  {active && <Check size={14} color={palette.sageDeep} strokeWidth={2.5} />}
-                  <Text style={[type.body, { color: active ? palette.sageDeep : colors.text, marginLeft: active ? 6 : 0, fontFamily: font.sansBold }]}>
+                  {active && <Check size={13} color={palette.chalk} strokeWidth={2.8} style={{ marginRight: 5 }} />}
+                  <Text style={[styles.condText, { color: active ? palette.chalk : colors.text }]}>
                     {CONDITION_LABELS[c]}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        </GlassPanel>
+        </View>
 
-        {/* Your goals */}
-        <SectionHeader title="Your Daily Goals" colors={colors} />
-        <GlassPanel style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <View style={styles.rdaHero}>
-            <View>
-              <Text style={[type.bodySm, { color: colors.subText }]}>Calories</Text>
-              <Text style={[type.h1, { fontSize: 32, color: colors.text }]}>{tdee}</Text>
-              <Text style={[type.bodySm, { color: colors.subText }]}>per day</Text>
-            </View>
-            <View style={styles.bmiBox}>
-              <Text style={[type.bodySm, { color: colors.subText }]}>BMI</Text>
-              <Text style={[type.h1, { fontSize: 32, color: colors.text }]}>{b}</Text>
-              <Pill tone={b < 18.5 || b >= 25 ? 'warning' : 'success'}>{bmiCategory(b)}</Pill>
-            </View>
+        {/* ── Daily Goals (Collapsible) ── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.goalsToggle, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => { Haptics.selectionAsync(); setGoalsExpanded((x) => !x); }}
+        >
+          <View style={styles.goalsToggleLeft}>
+            <Activity size={16} color={palette.sageDeep} strokeWidth={2.5} />
+            <Text style={[styles.goalsToggleText, { color: colors.text }]}>Your Daily Nutrition Goals</Text>
           </View>
-          <Divider color={colors.border} />
-          <GoalBar label="Protein" value={`${rda.proteinG}g`} pct={Math.min(1, rda.proteinG / 120)} color={palette.sageDeep} colors={colors} />
-          <GoalBar label="Carbs" value={`${rda.carbG}g`} pct={Math.min(1, rda.carbG / 400)} color={palette.clayDeep} colors={colors} />
-          <GoalBar label="Fat" value={`${rda.fatG}g`} pct={Math.min(1, rda.fatG / 100)} color={palette.warning} colors={colors} />
-          <GoalBar label="Fiber" value={`${rda.fiberG}g`} pct={Math.min(1, rda.fiberG / 35)} color={palette.slate2} colors={colors} />
-          <Divider color={colors.border} />
-          <View style={styles.microRow}>
-            <MicroCell label="Vit C" value={`${rda.vitC}mg`} colors={colors} />
-            <MicroCell label="Calcium" value={`${rda.calcium}mg`} colors={colors} />
-            <MicroCell label="Iron" value={`${rda.iron}mg`} colors={colors} />
-            <MicroCell label="Potassium" value={`${rda.potassium}mg`} colors={colors} />
-          </View>
-          <View style={styles.sodiumRow}>
-            <Text style={[type.body, { color: colors.subText }]}>Max sodium</Text>
-            <Text style={[type.h2, { color: rda.sodium <= 1500 ? palette.sageDeep : palette.warning }]}>{rda.sodium}mg</Text>
-          </View>
-        </GlassPanel>
+          {goalsExpanded
+            ? <ChevronUp size={18} color={colors.subText} strokeWidth={2.5} />
+            : <ChevronDown size={18} color={colors.subText} strokeWidth={2.5} />}
+        </TouchableOpacity>
 
-        <BrutalButton variant={saved ? 'sage' : 'sage'} onPress={save} style={{ marginTop: spacing[4] }}>
-          {saved && <Check size={16} color={palette.chalk} style={{ marginRight: 8 }} />}
-          <Text style={[type.label, { color: palette.chalk }]}>{saved ? 'SAVED' : 'SAVE PROFILE'}</Text>
+        {goalsExpanded && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 0, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0 }]}>
+            {/* Calories + BMI hero */}
+            <View style={styles.heroRow}>
+              <View style={styles.heroCell}>
+                <Text style={[styles.heroNum, { color: colors.text }]}>{tdee}</Text>
+                <Text style={[styles.heroLabel, { color: colors.subText }]}>kcal / day</Text>
+              </View>
+              <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.heroCell}>
+                <Text style={[styles.heroNum, { color: b < 18.5 || b >= 25 ? palette.warning : palette.sageDeep }]}>{b}</Text>
+                <Text style={[styles.heroLabel, { color: colors.subText }]}>BMI · {bmiCategory(b)}</Text>
+              </View>
+            </View>
+
+            <Divider color={colors.border} />
+
+            <GoalBar label="Protein" value={`${rda.proteinG}g`} pct={Math.min(1, rda.proteinG / 120)} color={palette.sageDeep} colors={colors} />
+            <GoalBar label="Carbs"   value={`${rda.carbG}g`}    pct={Math.min(1, rda.carbG / 400)}    color={palette.clayDeep}  colors={colors} />
+            <GoalBar label="Fat"     value={`${rda.fatG}g`}     pct={Math.min(1, rda.fatG / 100)}     color={palette.amberDeep} colors={colors} />
+            <GoalBar label="Fiber"   value={`${rda.fiberG}g`}   pct={Math.min(1, rda.fiberG / 35)}    color={palette.slate2}    colors={colors} />
+
+            <Divider color={colors.border} />
+
+            <View style={styles.microRow}>
+              <MicroCell label="Vit C"     value={`${rda.vitC}mg`}      colors={colors} />
+              <MicroCell label="Calcium"   value={`${rda.calcium}mg`}   colors={colors} />
+              <MicroCell label="Iron"      value={`${rda.iron}mg`}      colors={colors} />
+              <MicroCell label="Potassium" value={`${rda.potassium}mg`} colors={colors} />
+            </View>
+
+            <View style={[styles.sodiumRow, { borderColor: colors.border }]}>
+              <Text style={[styles.sodiumLabel, { color: colors.subText }]}>Max sodium</Text>
+              <Text style={[styles.sodiumValue, { color: rda.sodium <= 1500 ? palette.sageDeep : palette.warning }]}>{rda.sodium} mg</Text>
+            </View>
+          </View>
+        )}
+
+        {/* ── Save Button ── */}
+        <BrutalButton variant="sage" onPress={save} style={{ marginTop: spacing[5] }}>
+          {saved && <Check size={16} color={palette.chalk} strokeWidth={2.8} style={{ marginRight: 8 }} />}
+          <Text style={[type.label, { color: palette.chalk }]}>{saved ? '✓ SAVED!' : 'SAVE PROFILE'}</Text>
         </BrutalButton>
+
+        {/* ── Account Actions ── */}
+        <View style={[styles.accountBox, { borderColor: colors.border }]}>
+          <Text style={[styles.accountLabel, { color: colors.subText }]}>ACCOUNT</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.accountRow, { borderColor: colors.border }]}
+            onPress={handleLogout}
+          >
+            <LogOut size={18} color={colors.text} strokeWidth={2.5} />
+            <Text style={[styles.accountRowText, { color: colors.text }]}>Log Out</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.accountRow, { borderColor: 'transparent' }]}
+            onPress={handleDeleteAccount}
+          >
+            <Trash2 size={18} color={palette.danger} strokeWidth={2.5} />
+            <Text style={[styles.accountRowText, { color: palette.danger }]}>Delete Account</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-function StatBox({ label, value, color, subColor, borderColor, bg }: { label: string; value: any; color: string; subColor: string; borderColor: string, bg: string }) {
+/* ─── Sub-components ─────────────────────────────────────────── */
+
+function SectionLabel({ title, subtitle, colors }: { title: string; subtitle?: string; colors: any }) {
   return (
-    <View style={{ flex: 1, borderWidth: 1, borderRadius: 12, borderColor, padding: spacing[3], backgroundColor: bg }}>
-      <Text style={[type.h1, { color }]}>{value}</Text>
-      <Text style={[type.bodySm, { color: subColor, marginTop: 4 }]}>{label}</Text>
+    <View style={{ marginBottom: 8, marginTop: 20 }}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      {subtitle && <Text style={[styles.sectionSub, { color: colors.subText }]}>{subtitle}</Text>}
     </View>
   );
 }
 
-function Field({ label, colors, children }: { label: string; colors: any; children: any }) {
+function StatBox({ label, value, accent, colors }: { label: string; value: any; accent: string; colors: any }) {
+  return (
+    <View style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.subText }]}>{label}</Text>
+    </View>
+  );
+}
+
+function NumField({ label, value, onChange, colors }: { label: string; value: number; onChange: (v: number) => void; colors: any }) {
   return (
     <View style={{ flex: 1 }}>
-      <Text style={[type.bodySm, { color: colors.subText, fontFamily: font.sansBold }]}>{label.toUpperCase()}</Text>
-      <View style={{ marginTop: 6 }}>{children}</View>
+      <Text style={[styles.fieldLabel, { color: colors.subText }]}>{label}</Text>
+      <TextInput
+        style={[styles.numInput, { color: colors.text, backgroundColor: colors.bg, borderColor: colors.border }]}
+        value={String(value)}
+        keyboardType="numeric"
+        onChangeText={(t) => onChange(Number(t) || 0)}
+      />
     </View>
-  );
-}
-
-function NumInput({ value, onChange, colors }: { value: number; onChange: (v: number) => void; colors: any }) {
-  return (
-    <TextInput
-      style={[styles.numInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]}
-      value={String(value)}
-      keyboardType="numeric"
-      onChangeText={(t) => onChange(Number(t) || 0)}
-    />
   );
 }
 
 function GoalBar({ label, value, pct, color, colors }: { label: string; value: string; pct: number; color: string; colors: any }) {
   return (
     <View style={styles.goalBarRow}>
-      <Text style={[type.body, { color: colors.text, width: 70 }]}>{label}</Text>
-      <View style={{ flex: 1, marginHorizontal: 8 }}>
+      <Text style={[styles.goalLabel, { color: colors.subText }]}>{label}</Text>
+      <View style={{ flex: 1, marginHorizontal: 10 }}>
         <Bar value={pct} color={color} track={colors.border} />
       </View>
-      <Text style={[type.monoBold, { color: colors.text, width: 50, textAlign: 'right' }]}>{value}</Text>
+      <Text style={[styles.goalValue, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }
 
 function MicroCell({ label, value, colors }: { label: string; value: string; colors: any }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: 8, borderColor: colors.border, backgroundColor: colors.bg, paddingVertical: spacing[3] }}>
-      <Text style={[type.h2, { fontSize: 16, color: colors.text }]}>{value}</Text>
-      <Text style={[type.bodySm, { color: colors.subText, fontSize: 11, marginTop: 4 }]}>{label}</Text>
+    <View style={[styles.microCell, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+      <Text style={[styles.microValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.microLabel, { color: colors.subText }]}>{label}</Text>
     </View>
   );
 }
 
+/* ─── Styles ─────────────────────────────────────────────────── */
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { flex: 1, paddingHorizontal: spacing[4] },
-  header: { marginBottom: spacing[4], marginTop: spacing[3] },
-  darkToggle: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: spacing[3], paddingVertical: spacing[2], alignSelf: 'flex-start', marginTop: spacing[3] },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: spacing[4] },
-  card: { borderWidth: 1, padding: spacing[4], marginBottom: spacing[3] },
-  row: { flexDirection: 'row', gap: 12 },
-  numInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: spacing[3], paddingVertical: spacing[2], fontFamily: font.sans, fontSize: 16 },
-  segmentRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  segment: { flex: 1, paddingVertical: spacing[3], borderWidth: 1, borderRadius: 12, alignItems: 'center' },
-  activityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  activityCell: { width: '31%', paddingVertical: spacing[3], borderWidth: 1, borderRadius: 12, alignItems: 'center' },
-  condGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  condChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderWidth: 1, borderRadius: 12 },
-  rdaHero: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  bmiBox: { alignItems: 'flex-end', gap: 4 },
-  goalBarRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
-  microRow: { flexDirection: 'row', marginVertical: spacing[3], gap: 8 },
-  sodiumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing[3] },
+  container:        { flex: 1 },
+  scroll:           { flex: 1, paddingHorizontal: spacing[4] },
+
+  // Header
+  headerRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[4] },
+  screenTitle:      { fontSize: 28, fontFamily: font.sansBold, letterSpacing: -0.5 },
+  screenSub:        { fontSize: 13, fontFamily: font.sans, marginTop: 2 },
+  modeToggle:       { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+
+  // Stats
+  statsRow:         { flexDirection: 'row', gap: 10, marginBottom: spacing[2] },
+  statBox:          { flex: 1, borderWidth: 1.5, borderRadius: 14, padding: spacing[3], alignItems: 'center' },
+  statValue:        { fontSize: 22, fontFamily: font.sansBold, letterSpacing: -0.5 },
+  statLabel:        { fontSize: 11, fontFamily: font.sans, marginTop: 3, textAlign: 'center' },
+
+  // Section label
+  sectionTitle:     { fontSize: 15, fontFamily: font.sansBold, letterSpacing: 0.2 },
+  sectionSub:       { fontSize: 12, fontFamily: font.sans, marginTop: 2 },
+
+  // Card
+  card:             { borderWidth: 1.5, borderRadius: 16, padding: spacing[4], marginBottom: spacing[3] },
+
+  // Form
+  fieldLabel:       { fontSize: 11, fontFamily: font.sansBold, letterSpacing: 0.8, marginBottom: 6 },
+  textInput:        { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, fontFamily: font.sans },
+  numRow:           { flexDirection: 'row', gap: 10, marginTop: 14 },
+  numInput:         { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, fontSize: 15, fontFamily: font.sans, textAlign: 'center', marginTop: 6 },
+
+  // Sex
+  segRow:           { flexDirection: 'row', gap: 10 },
+  segChip:          { flex: 1, paddingVertical: 12, borderWidth: 1.5, borderRadius: 12, alignItems: 'center' },
+  segText:          { fontSize: 14, fontFamily: font.sansBold },
+
+  // Activity
+  activityGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  activityChip:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1.5, borderRadius: 12, gap: 6 },
+  activityEmoji:    { fontSize: 15 },
+  activityText:     { fontSize: 13, fontFamily: font.sansBold },
+
+  // Conditions
+  condGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  condChip:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1.5, borderRadius: 12 },
+  condText:         { fontSize: 13, fontFamily: font.sansBold },
+
+  // Goals toggle
+  goalsToggle:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: spacing[4], marginTop: 20 },
+  goalsToggleLeft:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  goalsToggleText:  { fontSize: 14, fontFamily: font.sansBold },
+
+  // Goals hero
+  heroRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[2] },
+  heroCell:         { flex: 1, alignItems: 'center' },
+  heroNum:          { fontSize: 30, fontFamily: font.sansBold, letterSpacing: -1 },
+  heroLabel:        { fontSize: 12, fontFamily: font.sans, marginTop: 4 },
+  heroDivider:      { width: 1, height: 50, marginHorizontal: 12 },
+
+  // Goal bars
+  goalBarRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  goalLabel:        { width: 52, fontSize: 13, fontFamily: font.sans },
+  goalValue:        { width: 52, fontSize: 13, fontFamily: font.sansBold, textAlign: 'right' },
+
+  // Micros
+  microRow:         { flexDirection: 'row', gap: 8, marginVertical: spacing[3] },
+  microCell:        { flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingVertical: 10 },
+  microValue:       { fontSize: 13, fontFamily: font.sansBold },
+  microLabel:       { fontSize: 10, fontFamily: font.sans, marginTop: 3 },
+
+  // Sodium
+  sodiumRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, paddingTop: spacing[3] },
+  sodiumLabel:      { fontSize: 13, fontFamily: font.sans },
+  sodiumValue:      { fontSize: 18, fontFamily: font.sansBold },
+
+  // Account section
+  accountBox:       { borderWidth: 1.5, borderRadius: 16, marginTop: spacing[5], overflow: 'hidden' },
+  accountLabel:     { fontSize: 10, fontFamily: font.sansBold, letterSpacing: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+  accountRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1 },
+  accountRowText:   { fontSize: 15, fontFamily: font.sansBold },
 });

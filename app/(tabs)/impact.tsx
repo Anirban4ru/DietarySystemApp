@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
-import { Leaf, Flame, Award, TrendingUp, TrendingDown, Minus, Target, X, Zap } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { Leaf, Flame, Award, TrendingUp, TrendingDown, Minus, Target, X, Zap, Sprout, Shield, Globe } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
-import { BrutalButton, GlassPanel, Label, Pill, Bar, Divider, SectionHeader, useTheme } from '@/components/ui';
+import { BrutalButton, GlassPanel, Label, Pill, Bar, Divider, SectionHeader, useTheme, PressScale } from '@/components/ui';
+import { BottomSheet } from '@/components/BottomSheet';
 import { useImpact, useDisposals, useXp, useWeeklyGoals } from '@/lib/hooks';
 import { summarizeImpact, forecastDisposal, earnedBadges, BADGES } from '@/lib/impact';
 import { compareHousehold, computeLevel, computeWeeklyGoal } from '@/lib/features';
@@ -41,7 +42,7 @@ export default function ImpactScreen() {
   }, [disposals]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }] as any}>
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.header}>
           <Text style={[type.display, { color: colors.text }]}>Impact</Text>
@@ -49,7 +50,7 @@ export default function ImpactScreen() {
         </View>
 
         {/* Level + XP */}
-        <GlassPanel style={[styles.levelCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <GlassPanel style={[styles.levelCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
           <View style={styles.levelHead}>
             <View style={styles.levelBadge}>
               <Text style={[type.display, { fontSize: 24, color: palette.chalk }]}>{level.current.level}</Text>
@@ -72,7 +73,7 @@ export default function ImpactScreen() {
         </GlassPanel>
 
         {/* Big CO2 number */}
-        <GlassPanel style={[styles.co2Card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <GlassPanel style={[styles.co2Card, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
           <Leaf size={28} color={palette.sageDeep} strokeWidth={2.5} />
           <View style={{ marginLeft: spacing[3] }}>
             <Text style={[type.display, { fontSize: 40, color: summary.totalCo2eAvoided >= 0 ? palette.sageDeep : palette.danger }]}>
@@ -90,14 +91,14 @@ export default function ImpactScreen() {
         </View>
 
         {/* Streak */}
-        <View style={[styles.streakBox, { borderColor: palette.warning }]}>
+        <View style={[styles.streakBox, { borderColor: palette.warning }] as any}>
           <Flame size={18} color={palette.warning} fill={palette.warning} strokeWidth={2.5} />
           <Text style={[type.body, { marginLeft: 8, color: palette.warning, fontFamily: font.sansBold }]}>{summary.streakDays} day streak</Text>
         </View>
 
         {/* Weekly goal */}
         <SectionHeader title="This Week" colors={colors} />
-        <GlassPanel style={[styles.goalCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <GlassPanel style={[styles.goalCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
           <View style={styles.goalHead}>
             <Target size={16} color={colors.text} strokeWidth={2.5} />
             <Text style={[type.body, { marginLeft: 8, color: colors.text, fontFamily: font.sansBold, flex: 1 }]}>Weekly goal</Text>
@@ -119,14 +120,14 @@ export default function ImpactScreen() {
         {summary.co2eByDay.length > 0 && (
           <>
             <SectionHeader title="Last 7 Days" colors={colors} />
-            <GlassPanel style={[styles.chartCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <GlassPanel style={[styles.chartCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
               <View style={styles.chart}>
                 {summary.co2eByDay.map((d) => {
                   const h = (Math.abs(d.kg) / maxDay) * 100;
                   return (
                     <View key={d.day} style={styles.chartCol}>
                       <View style={styles.chartBarWrap}>
-                        <View style={[styles.chartBar, { height: `${Math.max(4, h)}%`, backgroundColor: d.kg >= 0 ? palette.sageDeep : palette.danger, borderRadius: 4 }]} />
+                        <View style={[styles.chartBar, { height: `${Math.max(4, h)}%`, backgroundColor: d.kg >= 0 ? palette.sageDeep : palette.danger, borderRadius: 4 }] as any} />
                       </View>
                       <Text style={[type.mono, { fontSize: 8, color: colors.subText, marginTop: 4 }]}>{d.day.slice(5)}</Text>
                     </View>
@@ -139,14 +140,14 @@ export default function ImpactScreen() {
 
         {/* Comparison */}
         <SectionHeader title="vs Average Household" colors={colors} />
-        <GlassPanel style={[styles.compareCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <GlassPanel style={[styles.compareCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
           <View style={styles.compareRow}>
             <View style={{ flex: 1 }}>
               <Text style={[type.bodySm, { color: colors.subText }]}>You</Text>
               <Text style={[type.h1, { color: palette.sageDeep }]}>{comparison.userRate}</Text>
               <Text style={[type.bodySm, { color: colors.subText }]}>kg/meal</Text>
             </View>
-            <View style={[styles.compareVs, { borderColor: colors.border }]}>
+            <View style={[styles.compareVs, { borderColor: colors.border }] as any}>
               <Text style={[type.mono, { color: colors.subText, fontSize: 9 }]}>vs</Text>
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -156,7 +157,7 @@ export default function ImpactScreen() {
             </View>
           </View>
           {comparison.pctBetter > 0 && (
-            <View style={[styles.compareBadge, { backgroundColor: palette.sageDeep }]}>
+            <View style={[styles.compareBadge, { backgroundColor: palette.sageDeep }] as any}>
               <Text style={[type.monoBold, { color: palette.chalk, fontSize: 11 }]}>{comparison.pctBetter}% better</Text>
             </View>
           )}
@@ -164,12 +165,12 @@ export default function ImpactScreen() {
 
         {/* Waste heatmap */}
         <SectionHeader title="Waste History" subtitle="Last 4 weeks. Darker = more food tossed." colors={colors} />
-        <GlassPanel style={[styles.heatmapCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <GlassPanel style={[styles.heatmapCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
           <View style={styles.heatmapGrid}>
             {heatmap.map((d, i) => {
               const bg = d.count === 0 ? colors.border : d.count === 1 ? palette.danger + '80' : palette.danger;
               return (
-                <View key={i} style={[styles.heatCell, { backgroundColor: bg, borderColor: d.isToday ? colors.text : 'transparent', borderWidth: d.isToday ? 2 : 0, borderRadius: 4 }]} />
+                <View key={i} style={[styles.heatCell, { backgroundColor: bg, borderColor: d.isToday ? colors.text : 'transparent', borderWidth: d.isToday ? 2 : 0, borderRadius: 4 }] as any} />
               );
             })}
           </View>
@@ -180,10 +181,15 @@ export default function ImpactScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.badgeScroll}>
           {BADGES.map((b) => {
             const got = earned.some((e) => e.id === b.id);
+            const Icon = b.icon === 'leaf' ? Leaf :
+                         b.icon === 'sprout' ? Sprout :
+                         b.icon === 'shield' ? Shield :
+                         b.icon === 'globe' ? Globe :
+                         b.icon === 'flame' ? Flame : Award;
             return (
-              <View key={b.id} style={[styles.badge, { borderColor: got ? palette.sageDeep : colors.border, backgroundColor: colors.surface, opacity: got ? 1 : 0.4 }]}>
-                <View style={[styles.badgeIcon, { backgroundColor: got ? palette.sageDeep : colors.border, borderRadius: 20 }]}>
-                  <Award size={18} color={got ? palette.chalk : colors.subText} strokeWidth={2.5} />
+              <View key={b.id} style={[styles.badge, { borderColor: got ? palette.sageDeep : colors.border, backgroundColor: colors.surface, opacity: got ? 1 : 0.4 }] as any}>
+                <View style={[styles.badgeIcon, { backgroundColor: got ? palette.sageDeep : colors.border, borderRadius: 20 }] as any}>
+                  <Icon size={18} color={got ? palette.chalk : colors.subText} strokeWidth={2.5} />
                 </View>
                 <Text style={[type.bodySm, { marginTop: 6, color: colors.text, fontFamily: font.sansBold, textAlign: 'center' }]}>{b.label}</Text>
               </View>
@@ -195,12 +201,12 @@ export default function ImpactScreen() {
         {forecast.length > 0 && (
           <>
             <SectionHeader title="Your Habits" subtitle="What you toss most often." colors={colors} />
-            <GlassPanel style={[styles.forecastCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <GlassPanel style={[styles.forecastCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
               {forecast.map((f) => {
                 const Icon = f.trend === 'up' ? TrendingUp : f.trend === 'down' ? TrendingDown : Minus;
                 const color = f.trend === 'up' ? palette.danger : f.trend === 'down' ? palette.sageDeep : colors.subText;
                 return (
-                  <View key={f.category} style={[styles.forecastRow, { borderBottomColor: colors.border }]}>
+                  <View key={f.category} style={[styles.forecastRow, { borderBottomColor: colors.border }] as any}>
                     <Text style={[type.body, { flex: 1, color: colors.text, textTransform: 'capitalize' }]}>{f.category.replace('_', ' ')}</Text>
                     <Text style={[type.monoBold, { color, marginRight: 8 }]}>{f.weeklyRate}/wk</Text>
                     <Icon size={16} color={color} strokeWidth={2.5} />
@@ -210,6 +216,26 @@ export default function ImpactScreen() {
             </GlassPanel>
           </>
         )}
+        {/* Leaderboard */}
+        <SectionHeader title="Global Leaderboard" subtitle="Top community chefs by XP" colors={colors} />
+        <GlassPanel style={[styles.forecastCard, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
+          {[
+            { name: 'Chef Nourish', xp: 5200 },
+            { name: 'EcoEater', xp: 4800 },
+            { name: 'Sarah G.', xp: 3450 },
+            { name: 'You', xp: xp, isUser: true },
+            { name: 'Mike (Vegan)', xp: 2100 },
+            { name: 'ZeroWasteFan', xp: 1950 },
+          ].sort((a, b) => b.xp - a.xp).slice(0, 5).map((u, i) => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderBottomWidth: i < 4 ? 1 : 0, borderBottomColor: colors.border }}>
+              <Text style={[type.monoBold, { color: u.isUser ? palette.sageDeep : colors.subText, width: 30 }]}>#{i+1}</Text>
+              <Text style={[type.body, { flex: 1, color: u.isUser ? colors.text : colors.subText, fontFamily: u.isUser ? font.sansBold : font.sans }]}>{u.name}</Text>
+              <Text style={[type.h3, { color: u.isUser ? palette.sageDeep : colors.text }]}>{u.xp} XP</Text>
+            </View>
+          ))}
+        </GlassPanel>
+
+        <View style={{ height: spacing[6] }} />
 
         <GoalModal visible={goalModal} onClose={() => setGoalModal(false)} goals={goals} onSave={update} />
       </ScrollView>
@@ -238,23 +264,21 @@ function GoalModal({ visible, onClose, goals, onSave }: { visible: boolean; onCl
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <GlassPanel style={[styles.modalPanel, { backgroundColor: colors.surface }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[type.h1, { color: colors.text }]}>Set your goals</Text>
-            <TouchableOpacity onPress={() => { Haptics.selectionAsync(); onClose(); }}>
-              <X size={24} color={colors.subText} strokeWidth={2.5} />
-            </TouchableOpacity>
+    <BottomSheet visible={visible} onClose={onClose}>
+      <View style={styles.modalHeader}>
+        <Text style={[type.h1, { color: colors.text }]}>Set your goals</Text>
+        <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
+          <View style={[styles.closeBtn, { borderColor: colors.border }]}>
+            <X size={18} color={colors.subText} strokeWidth={2.5} />
           </View>
-          <Label>MEALS PER WEEK</Label>
-          <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]} value={meals} onChangeText={setMeals} keyboardType="numeric" />
-          <Label style={{ marginTop: spacing[4] }}>KG CO2 TO SAVE</Label>
-          <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]} value={co2e} onChangeText={setCo2e} keyboardType="numeric" />
-          <BrutalButton variant="sage" onPress={save} style={{ marginTop: spacing[5] }}>SAVE GOALS</BrutalButton>
-        </GlassPanel>
+        </PressScale>
       </View>
-    </Modal>
+      <Label>MEALS PER WEEK</Label>
+      <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }] as any} value={meals} onChangeText={setMeals} keyboardType="numeric" />
+      <Label style={{ marginTop: spacing[4] }}>KG CO2 TO SAVE</Label>
+      <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }] as any} value={co2e} onChangeText={setCo2e} keyboardType="numeric" />
+      <BrutalButton variant="sage" onPress={save} style={{ marginTop: spacing[5] }}>SAVE GOALS</BrutalButton>
+    </BottomSheet>
   );
 }
 
@@ -287,8 +311,7 @@ const styles = StyleSheet.create({
   badgeIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   forecastCard: { borderWidth: 1, padding: spacing[4], marginBottom: spacing[3] },
   forecastRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderBottomWidth: 1 },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalPanel: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[4] },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontFamily: font.sans, fontSize: 15, marginTop: 8 },
 });

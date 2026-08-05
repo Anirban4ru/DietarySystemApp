@@ -1,8 +1,19 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
 import { InventoryRow, ProfileRow, ImpactLogRow, DisposalRow, FoodCategory, Condition } from './types';
 import { FOOD_BY_NAME } from './foodCatalog';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export function useInventory() {
   const [items, setItems] = useState<InventoryRow[]>([]);
@@ -34,6 +45,18 @@ export function useInventory() {
     const category = input.category ?? food?.category ?? 'other';
     const shelf = input.shelfLifeDays ?? food?.shelfLifeDays ?? 7;
     const expires = new Date(Date.now() + shelf * 86400000).toISOString();
+    
+    // OPTIMISTIC UPDATE
+    const tempId = 'temp-' + Math.random().toString(36).substr(2, 9);
+    const tempRow: InventoryRow = {
+      id: tempId, name: input.name, category, added_at: new Date().toISOString(),
+      quantity: input.quantity ?? 1, unit: input.unit ?? 'unit',
+      expires_at: expires, freshness_score: input.freshnessScore ?? 1, notes: input.notes ?? null
+    };
+    
+    setItems((prev) => [...prev, tempRow].sort((a, b) =>
+      (a.expires_at ?? '').localeCompare(b.expires_at ?? '')));
+
     const { data, error } = await supabase
       .from('inventory_items')
       .insert({
@@ -41,17 +64,52 @@ export function useInventory() {
         expires_at: expires, freshness_score: input.freshnessScore ?? 1, notes: input.notes ?? null,
       })
       .select().single();
-    if (error) { setError(error.message); return null; }
-    setItems((prev) => [...prev, data as InventoryRow].sort((a, b) =>
-      (a.expires_at ?? '').localeCompare(b.expires_at ?? '')));
+      
+    if (error) { 
+      setError(error.message); 
+      // Revert optimistic update on failure
+      setItems((prev) => prev.filter((i) => i.id !== tempId));
+      return null; 
+    }
+    
+    // Replace temp row with real data from DB
+    setItems((prev) => {
+      const filtered = prev.filter((i) => i.id !== tempId);
+      return [...filtered, data as InventoryRow].sort((a, b) =>
+        (a.expires_at ?? '').localeCompare(b.expires_at ?? ''));
+    });
+    
+    if (shelf > 2) {
+      const notifyDate = new Date(Date.now() + (shelf - 2) * 86400000);
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `Your ${input.name} is expiring soon! 🥗`,
+            body: `Use it in the next 2 days to prevent food waste. Tap to find a recipe.`,
+            data: { screen: 'recipes' },
+          },
+          trigger: { type: 'date', date: notifyDate } as Notifications.DateTriggerInput,
+        });
+      } catch (e) {
+        console.warn('Notification scheduling failed', e);
+      }
+    }
+
     return data as InventoryRow;
   }, []);
 
   const remove = useCallback(async (id: string) => {
-    const { error } = await supabase.from('inventory_items').delete().eq('id', id);
-    if (error) { setError(error.message); return; }
+    // OPTIMISTIC UPDATE
     setItems((prev) => prev.filter((i) => i.id !== id));
-  }, []);
+    
+    const { error } = await supabase.from('inventory_items').delete().eq('id', id);
+    if (error) { 
+      setError(error.message); 
+      // Rollback would go here if we kept a backup of the items, but for now we'll just reload
+      load();
+      return; 
+    }
+  }, [load]);
 
   return { items, loading, error, reload: load, add, remove };
 }
@@ -203,7 +261,11 @@ export function useShoppingList() {
 
   const addItems = useCallback(async (newItems: { item_name: string; category: string; quantity: number }[]) => {
     if (newItems.length === 0) return;
-    const { data } = await supabase.from('shopping_list').insert(newItems).select();
+    const { data, error } = await supabase.from('shopping_list').insert(newItems).select();
+    if (error) {
+      console.error('Shopping list insert error:', error);
+      alert('Database error: ' + error.message + ' (Did you run ids_feature_expansion.sql?)');
+    }
     if (data) setItems((prev) => [...(data as ShoppingItem[]), ...prev]);
   }, []);
 
@@ -257,9 +319,13 @@ export function useMealPlan() {
   const add = useCallback(async (day_of_week: number, meal_type: string, recipe_name: string) => {
     const today = new Date();
     today.setDate(today.getDate() + day_of_week);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('meal_plan').insert({ day_of_week, meal_type, recipe_name, planned_date: today.toISOString().slice(0, 10) })
       .select().single();
+    if (error) {
+      console.error('Meal plan insert error:', error);
+      alert('Database error: ' + error.message);
+    }
     if (data) setPlan((prev) => [...prev, data as MealPlanEntry]);
   }, []);
 

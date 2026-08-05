@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, interpolate } from 'react-native-reanimated';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { ScanLine, Check, Zap, Sun, Moon, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ScanLine, Check, Zap, Sun, Moon, ChevronDown, ChevronUp, Barcode, Wand2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, type, spacing, border } from '@/lib/theme';
-import { GlassPanel, Pill, BrutalButton, Loader, useTheme } from '@/components/ui';
+import { GlassPanel, Pill, BrutalButton, PressScale, Loader, useTheme, useToast } from '@/components/ui';
 import { FOOD_CATALOG } from '@/lib/foodCatalog';
 import { useInventory, useXp } from '@/lib/hooks';
+import { detectFoodItem, parseReceipt } from '@/lib/ai';
 
 const COMMON_ITEMS = [
   'Banana', 'Apple', 'Tomato', 'Carrot', 'Spinach', 'Eggs', 'Milk',
@@ -16,29 +19,43 @@ const COMMON_ITEMS = [
 
 export default function ScannerScreen() {
   const { colors, mode, toggle } = useTheme();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
   const { add } = useInventory();
   const { addXp } = useXp();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
+  const [scanMode, setScanMode] = useState<'item' | 'receipt' | 'barcode'>('item');
   const [detected, setDetected] = useState<{ name: string; confidence: number; freshness: number } | null>(null);
-  const [status, setStatus] = useState('Point at a food item');
+  const [receiptItems, setReceiptItems] = useState<{ name: string; quantity: number }[] | null>(null);
+  const [status, setStatus] = useState('Point at a food item or receipt');
   const [saved, setSaved] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const reticleAnim = useRef(new Animated.Value(0)).current;
+  const reticleAnim = useSharedValue(0);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
     if (scanning) {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(reticleAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-          Animated.timing(reticleAnim, { toValue: 0, duration: 900, useNativeDriver: true }),
-        ]),
+      reticleAnim.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 900 }),
+          withTiming(0, { duration: 900 })
+        ),
+        -1, // infinite loop
+        false // no reverse
       );
-      loop.start();
-      return () => loop.stop();
+    } else {
+      reticleAnim.value = withTiming(0);
     }
-  }, [scanning, reticleAnim]);
+  }, [scanning]);
+
+  const rReticleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(reticleAnim.value, [0, 1], [0.92, 1.04]) }]
+  }));
+
+  const rScanlineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(reticleAnim.value, [0, 1], [-80, 80]) }]
+  }));
 
   if (!permission) return <View style={[styles.center, { backgroundColor: colors.bg }]} />;
 
@@ -51,7 +68,7 @@ export default function ScannerScreen() {
           </View>
           <Text style={[type.h2, { marginTop: spacing[4], color: colors.text }]}>Camera Needed</Text>
           <Text style={[type.body, { color: colors.subText, marginTop: spacing[2], textAlign: 'center' }]}>
-            The scanner uses your camera to detect food on-device. Nothing is uploaded.
+            Images are securely processed via our AI backend to detect food, but are never saved or used for training.
           </Text>
           <BrutalButton variant="sage" onPress={requestPermission} style={{ marginTop: spacing[6] }}>
             ENABLE CAMERA
@@ -68,79 +85,73 @@ export default function ScannerScreen() {
     setStatus('Analyzing with AI...');
     try {
       if (!cameraRef.current) throw new Error('Camera not ready');
-      // Low quality + skipProcessing drastically speeds up base64 encoding on old devices
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.1, skipProcessing: true });
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.2, skipProcessing: true });
       
-      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) {
-        setStatus('Missing EXPO_PUBLIC_GEMINI_API_KEY. Simulating...');
-        setTimeout(() => {
-          const pick = COMMON_ITEMS[Math.floor(Math.random() * COMMON_ITEMS.length)];
-          const confidence = 0.82 + Math.random() * 0.16;
-          const freshness = 0.55 + Math.random() * 0.4;
-          setDetected({ name: pick, confidence, freshness });
-          setStatus(`Found: ${pick}`);
-          setScanning(false);
+      if (!photo?.base64) throw new Error("Could not capture image");
+
+      if (scanMode === 'receipt') {
+        const result = await parseReceipt(photo.base64);
+        if (result.items && result.items.length > 0) {
+          setReceiptItems(result.items);
+          setStatus(`Found ${result.items.length} items`);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }, 800);
-        return;
+        } else {
+          throw new Error("No food items found on receipt");
+        }
+      } else {
+        const result = await detectFoodItem(photo.base64);
+        const foodName = FOOD_CATALOG.find(f => f.name.toLowerCase() === result.name?.toLowerCase())?.name || result.name || 'Unknown Item';
+
+        if (result.confidence > 0.4) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await add({
+            name: foodName,
+            quantity: 1,
+            unit: 'unit',
+            freshnessScore: result.freshness,
+          });
+          setSaved(true);
+          setStatus(`Added ${foodName} to pantry`);
+          showToast(`Saved ${foodName} to Pantry!`, 'success');
+          
+          setTimeout(() => {
+            setScanning(false);
+            setSaved(false);
+            setStatus('Point at a food item or receipt');
+          }, 3000);
+        } else {
+          setStatus("Couldn't clearly identify food");
+          setTimeout(() => {
+            setScanning(false);
+            setStatus('Point at a food item or receipt');
+          }, 2000);
+        }
       }
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: 'Identify the raw food ingredient. Estimate freshness 0.0 to 1.0. JSON only: {"name": "Apple", "freshness": 0.9, "confidence": 0.95}' },
-                {
-                  inline_data: {
-                    mime_type: 'image/jpeg',
-                    data: photo?.base64
-                  }
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-          }
-        })
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Gemini API Error:', data);
-        throw new Error(data.error?.message || 'Failed to fetch from Gemini');
-      }
-
-      if (!data.candidates || data.candidates.length === 0) {
-        throw new Error('No candidates returned. Gemini blocked the image.');
-      }
-
-      const textResponse = data.candidates[0].content.parts[0].text;
-      const cleanJson = textResponse.replace(/```json|```/gi, '').trim();
-      const result = JSON.parse(cleanJson);
-      
-      const foodName = FOOD_CATALOG.find(f => f.name.toLowerCase() === result.name?.toLowerCase())?.name || result.name || 'Unknown Item';
-
-      setDetected({ name: foodName, confidence: result.confidence || 0.9, freshness: result.freshness || 0.8 });
-      setStatus(`Found: ${foodName}`);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
       console.error('Scan error:', e);
       setStatus(`Error: ${e.message || 'Scan failed'}`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
       setScanning(false);
     }
   };
 
   const saveItem = async () => {
+    if (scanMode === 'receipt' && receiptItems) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      for (const item of receiptItems) {
+        await add({ name: item.name, freshnessScore: 1, quantity: item.quantity });
+      }
+      await addXp(10);
+      setSaved(true);
+      setStatus(`Saved ${receiptItems.length} items`);
+      setTimeout(() => { 
+        setReceiptItems(null); 
+        setSaved(false); 
+        setStatus('Point at a receipt'); 
+      }, 400);
+      return;
+    }
+
     if (!detected) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await add({ name: detected.name, freshnessScore: detected.freshness });
@@ -152,14 +163,22 @@ export default function ScannerScreen() {
       setSaved(false); 
       setStatus('Point at a food item'); 
       setShowPicker(false);
-    }, 1200);
+    }, 300);
   };
 
   const discardItem = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDetected(null);
+    setReceiptItems(null);
     setShowPicker(false);
-    setStatus('Point at a food item');
+    setStatus(scanMode === 'receipt' ? 'Point at a receipt' : scanMode === 'barcode' ? 'Scan a barcode' : 'Point at a food item');
+  };
+
+  const handleBarcodeScanned = (data: string) => {
+    if (scanning || detected) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setDetected({ name: `Packaged Good (${data})`, confidence: 1, freshness: 1 });
+    setStatus('Barcode detected');
   };
 
   const freshnessLabel = detected
@@ -172,14 +191,19 @@ export default function ScannerScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.cameraWrap}>
-        <CameraView style={StyleSheet.absoluteFill} facing="back" ref={cameraRef} />
+        <CameraView 
+          style={StyleSheet.absoluteFill} 
+          facing="back" 
+          ref={cameraRef} 
+          barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'upc_e', 'upc_a'] }}
+          onBarcodeScanned={scanMode === 'barcode' && !detected ? ({ data }) => handleBarcodeScanned(data) : undefined}
+        />
         <View style={styles.overlay} pointerEvents="none">
           <Animated.View
             style={[styles.reticle, {
-              transform: [{ scale: reticleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.04] }) }],
               borderColor: scanning ? palette.sage : 'rgba(255,255,255,0.9)',
               borderWidth: border.thick,
-            }]}
+            }, rReticleStyle]}
           >
             <View style={[styles.corner, { top: -2, left: -2, borderLeftWidth: border.heavy, borderTopWidth: border.heavy }]} />
             <View style={[styles.corner, { top: -2, right: -2, borderRightWidth: border.heavy, borderTopWidth: border.heavy }]} />
@@ -187,9 +211,7 @@ export default function ScannerScreen() {
             <View style={[styles.corner, { bottom: -2, right: -2, borderRightWidth: border.heavy, borderBottomWidth: border.heavy }]} />
           </Animated.View>
           <View style={styles.scanlineWrap}>
-            <Animated.View style={[styles.scanline, {
-              transform: [{ translateY: reticleAnim.interpolate({ inputRange: [0, 1], outputRange: [-80, 80] }) }],
-            }]} />
+            <Animated.View style={[styles.scanline, rScanlineStyle]} />
           </View>
         </View>
         <TouchableOpacity style={styles.darkToggle} onPress={() => { Haptics.selectionAsync(); toggle(); }}>
@@ -203,8 +225,24 @@ export default function ScannerScreen() {
         {scanning ? (
           <View style={{ alignItems: 'center', paddingVertical: spacing[4] }}>
             <Loader />
-            <Text style={[type.label, { color: palette.chalk, marginTop: spacing[3] }]}>ANALYZING VIA GEMINI...</Text>
+            <Text style={[type.label, { color: palette.chalk, marginTop: spacing[3] }]}>ANALYZING IMAGE...</Text>
           </View>
+        ) : receiptItems ? (
+          <GlassPanel style={styles.resultPanel}>
+            <Text style={[type.h1, { color: colors.text, marginBottom: spacing[2] }]}>Receipt Items</Text>
+            <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+              {receiptItems.map((r, idx) => (
+                <Text key={idx} style={[type.body, { color: colors.text }]}>• {r.quantity}x {r.name}</Text>
+              ))}
+            </ScrollView>
+            <View style={styles.actionRow}>
+              <BrutalButton variant="outline" onPress={discardItem} style={{ flex: 1 }}>DISCARD</BrutalButton>
+              <BrutalButton variant="sage" onPress={saveItem} style={{ flex: 1.5 }}>
+                <Wand2 size={16} color={palette.chalk} strokeWidth={2.5} />
+                <Text style={[type.label, { color: palette.chalk, marginLeft: 8 }]}>{saved ? 'SAVED' : 'BATCH ADD TO PANTRY'}</Text>
+              </BrutalButton>
+            </View>
+          </GlassPanel>
         ) : detected ? (
           <GlassPanel style={styles.resultPanel}>
             <Text style={[type.h1, { color: colors.text }]}>{detected.name}</Text>
@@ -242,7 +280,7 @@ export default function ScannerScreen() {
                 DISCARD
               </BrutalButton>
               <BrutalButton variant="sage" onPress={saveItem} style={{ flex: 1 }}>
-                {saved ? <Check size={16} color={palette.chalk} strokeWidth={2.5} /> : <Check size={16} color={palette.chalk} strokeWidth={2.5} />}
+                <Check size={16} color={palette.chalk} strokeWidth={2.5} />
                 <Text style={[type.label, { color: palette.chalk, marginLeft: 8 }]}>
                   {saved ? 'SAVED' : 'SAVE'}
                 </Text>
@@ -250,10 +288,25 @@ export default function ScannerScreen() {
             </View>
           </GlassPanel>
         ) : (
-          <BrutalButton variant="sage" onPress={runScan} disabled={scanning} style={styles.scanBtn}>
-            <Zap size={18} color={palette.chalk} strokeWidth={2.5} />
-            <Text style={[type.label, { color: palette.chalk, marginLeft: 8 }]}>SCAN ITEM</Text>
-          </BrutalButton>
+          <View>
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: spacing[3] }}>
+              <BrutalButton variant={scanMode === 'item' ? 'sage' : 'dark'} onPress={() => setScanMode('item')} style={{ flex: 1, paddingVertical: spacing[2], paddingHorizontal: 4 }}>
+                <Text style={[type.label, { color: palette.chalk, fontSize: 11 }]}>AI VISUAL</Text>
+              </BrutalButton>
+              <BrutalButton variant={scanMode === 'receipt' ? 'sage' : 'dark'} onPress={() => setScanMode('receipt')} style={{ flex: 1, paddingVertical: spacing[2], paddingHorizontal: 4 }}>
+                <Text style={[type.label, { color: palette.chalk, fontSize: 11 }]}>RECEIPT</Text>
+              </BrutalButton>
+              <BrutalButton variant={scanMode === 'barcode' ? 'sage' : 'dark'} onPress={() => setScanMode('barcode')} style={{ flex: 1, paddingVertical: spacing[2], paddingHorizontal: 4 }}>
+                <Text style={[type.label, { color: palette.chalk, fontSize: 11 }]}>BARCODE</Text>
+              </BrutalButton>
+            </View>
+            <BrutalButton variant="sage" onPress={runScan} disabled={scanning || scanMode === 'barcode'} style={styles.scanBtn}>
+              {scanMode === 'barcode' ? <Barcode size={18} color={palette.chalk} strokeWidth={2.5} /> : <Zap size={18} color={palette.chalk} strokeWidth={2.5} />}
+              <Text style={[type.label, { color: palette.chalk, marginLeft: 8 }]}>
+                {scanMode === 'barcode' ? 'AUTO-SCANNING...' : `SCAN ${scanMode === 'receipt' ? 'RECEIPT' : 'ITEM'}`}
+              </Text>
+            </BrutalButton>
+          </View>
         )}
       </View>
     </View>

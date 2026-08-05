@@ -153,35 +153,55 @@ function scoreCompleteness(ingredients: { name: string; grams: number }[], inven
 
 // Non-dominated sort (NSGA-II core) for a small population.
 function nonDominatedSort(pop: RecipeCandidate[], w: OptimizerWeights): RecipeCandidate[] {
-  // scalarize for ranking but keep front structure
-  const score = (c: RecipeCandidate) =>
-    w.waste * c.wasteScore + w.rda * c.rdaScore + w.completeness * c.completeness;
-  const front: RecipeCandidate[] = [];
-  const rest = [...pop];
-  while (rest.length) {
-    // find non-dominated in rest
-    const nd: RecipeCandidate[] = [];
+  const fronts: RecipeCandidate[][] = [];
+  let rest = [...pop];
+  let rank = 1;
+  
+  while (rest.length > 0) {
+    const front: RecipeCandidate[] = [];
     for (let i = 0; i < rest.length; i++) {
       const c = rest[i];
-      const dominated = rest.some((d) => d !== c && dominates(d, c, w));
-      if (!dominated) nd.push(c);
+      const dominated = rest.some(d => d !== c && dominates(d, c, w));
+      if (!dominated) {
+        c.rank = rank;
+        front.push(c);
+      }
     }
-    nd.forEach((n) => rest.splice(rest.indexOf(n), 1));
-    front.push(...nd);
+    
+    assignCrowdingDistance(front);
+    front.sort((a: any, b: any) => b.crowdingDistance - a.crowdingDistance);
+    
+    fronts.push(front);
+    front.forEach((n) => rest.splice(rest.indexOf(n), 1));
+    rank++;
   }
-  // assign ranks by front order
-  let rank = 1;
-  const sorted = front.sort((a, b) => score(b) - score(a));
-  sorted.forEach((c, i) => {
-    c.rank = i < Math.ceil(sorted.length / 2) ? 1 : 2;
-  });
-  return sorted;
+  
+  return fronts.flat();
+}
+
+function assignCrowdingDistance(front: RecipeCandidate[]) {
+  if (front.length <= 2) {
+    front.forEach((f: any) => f.crowdingDistance = Infinity);
+    return;
+  }
+  front.forEach((f: any) => f.crowdingDistance = 0);
+  const objs = ['wasteScore', 'rdaScore', 'completeness'] as const;
+  for (const obj of objs) {
+    front.sort((a, b) => a[obj] - b[obj]);
+    (front[0] as any).crowdingDistance = Infinity;
+    (front[front.length - 1] as any).crowdingDistance = Infinity;
+    const range = front[front.length - 1][obj] - front[0][obj];
+    if (range === 0) continue;
+    for (let i = 1; i < front.length - 1; i++) {
+      (front[i] as any).crowdingDistance += (front[i + 1][obj] - front[i - 1][obj]) / range;
+    }
+  }
 }
 
 function dominates(a: RecipeCandidate, b: RecipeCandidate, w: OptimizerWeights): boolean {
-  const sa = w.waste * a.wasteScore + w.rda * a.rdaScore + w.completeness * a.completeness;
-  const sb = w.waste * b.wasteScore + w.rda * b.rdaScore + w.completeness * b.completeness;
-  return sa >= sb;
+  const wA = a.wasteScore * w.waste, rA = a.rdaScore * w.rda, cA = a.completeness * w.completeness;
+  const wB = b.wasteScore * w.waste, rB = b.rdaScore * w.rda, cB = b.completeness * w.completeness;
+  return (wA >= wB && rA >= rB && cA >= cB) && (wA > wB || rA > rB || cA > cB);
 }
 
 export function optimizeRecipes(
