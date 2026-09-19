@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider, ToastProvider, SplashOverlay, useTheme } from '@/components/ui';
+import { ProProvider } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import {
@@ -83,11 +84,13 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <AppContent />
-        {/* Animated splash overlay — hides once appReady */}
-        <SplashOverlay visible={!appReady} />
-      </ToastProvider>
+      <ProProvider>
+        <ToastProvider>
+          <AppContent />
+          {/* Animated splash overlay — hides once appReady */}
+          <SplashOverlay visible={!appReady} />
+        </ToastProvider>
+      </ProProvider>
     </ThemeProvider>
   );
 }
@@ -99,6 +102,7 @@ function AppContent() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" options={{ animation: 'fade' }} />
+        <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />

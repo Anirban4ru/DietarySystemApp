@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ScanLine, Boxes, ChefHat, User, Leaf, Calendar, ShoppingCart } from 'lucide-react-native';
+import { Home, Boxes, ChefHat, User, ScanLine, Calendar, ShoppingCart, Leaf } from 'lucide-react-native';
 import { useTheme } from '@/components/ui';
 import { palette } from '@/lib/theme';
 import { useInventory } from '@/lib/hooks';
@@ -49,8 +49,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Scan',
-          tabBarIcon: ({ color, size }) => <ScanLine color={color} size={size - 2} strokeWidth={2.5} />,
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size - 2} strokeWidth={2.5} />,
         }}
       />
       <Tabs.Screen

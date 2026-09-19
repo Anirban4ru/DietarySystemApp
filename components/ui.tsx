@@ -11,6 +11,8 @@ import * as Haptics from 'expo-haptics';
 import { Leaf } from 'lucide-react-native';
 import { palette, type, spacing, font, border } from '@/lib/theme';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ─────────────────────────────────────────────────────────────────
@@ -337,8 +339,6 @@ export function BrutalPanel({ children, style, dark }: { children: ReactNode; st
     </View>
   );
 }
-
-import { LinearGradient } from 'expo-linear-gradient';
 
 export function GlassPanel({ children, style, intensity = 70, gradient = false }: { children: ReactNode; style?: StyleProp<ViewStyle>; intensity?: number; gradient?: boolean }) {
   const { mode } = useTheme();

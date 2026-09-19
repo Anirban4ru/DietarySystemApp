@@ -3,18 +3,16 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
   ScrollView, Animated, PanResponder, ActivityIndicator,
 } from 'react-native';
-import { Plus, AlertTriangle, X, BookOpen, Check, Trash2, Filter, SortAsc, Zap, ChefHat, Info } from 'lucide-react-native';
+import { Plus, AlertTriangle, X, BookOpen, Check, Trash2, Filter, SortAsc, Zap, ChefHat, Info , ShoppingBag } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { palette, type, spacing, font, border } from '@/lib/theme';
 import { Label, Pill, Bar, GlassPanel, BrutalButton, PressScale, SkeletonCard, useTheme, useToast, Loader, EmptyState } from '@/components/ui';
-import { ShoppingBag } from 'lucide-react-native';
 import { useInventory, useImpact, useDisposals, useXp } from '@/lib/hooks';
-import { getTipInsight } from '@/lib/ai';
+import { getTipInsight , parseNaturalLanguagePantry } from '@/lib/ai';
 import { InventoryRow, FoodCategory } from '@/lib/types';
 import { FOOD_CATALOG, CATEGORY_LABELS, FOOD_BY_NAME, nutrientFraction } from '@/lib/foodCatalog';
 import { getStorageTip, xpForConsumed } from '@/lib/features';
-import { parseNaturalLanguagePantry } from '@/lib/ai';
 
 type SortKey = 'expiry' | 'name' | 'category';
 type FilterKey = 'all' | 'critical' | 'soon' | 'stable';

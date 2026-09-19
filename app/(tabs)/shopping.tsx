@@ -291,7 +291,7 @@ function AddShoppingModal({ visible, onClose, onAdd }: { visible: boolean; onClo
               <PressScale onPress={() => pick(query, 'other')}>
                  <View style={[styles.suggestRow, { borderBottomColor: colors.border }]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[type.body, { color: colors.text, fontFamily: font.sansBold }]}>Add "{query}"</Text>
+                      <Text style={[type.body, { color: colors.text, fontFamily: font.sansBold }]}>Add &quot;{query}&quot;</Text>
                       <Text style={[type.bodySm, { color: colors.subText }]}>Custom item</Text>
                     </View>
                     <Plus size={16} color={colors.subText} strokeWidth={2.5} />
