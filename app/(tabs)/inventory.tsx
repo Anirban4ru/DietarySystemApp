@@ -1,37 +1,21 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput,
-  ScrollView, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
+  ScrollView, Animated, PanResponder, ActivityIndicator,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, withRepeat, withSequence } from 'react-native-reanimated';
-import { Plus, AlertTriangle, X, BookOpen, Check, Trash2, Filter, Zap, Info, Apple, Carrot, Milk, Beef, Wheat, Leaf, Package } from 'lucide-react-native';
+import { Plus, AlertTriangle, X, BookOpen, Check, Trash2, Filter, SortAsc, Zap, ChefHat, Info , ShoppingBag } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { palette, type, spacing, font, border } from '@/lib/theme';
 import { Label, Pill, Bar, GlassPanel, BrutalButton, PressScale, SkeletonCard, useTheme, useToast, Loader, EmptyState } from '@/components/ui';
-import { BottomSheet } from '@/components/BottomSheet';
-import { ShoppingBag } from 'lucide-react-native';
 import { useInventory, useImpact, useDisposals, useXp } from '@/lib/hooks';
-import { getTipInsight } from '@/lib/ai';
+import { getTipInsight , parseNaturalLanguagePantry } from '@/lib/ai';
 import { InventoryRow, FoodCategory } from '@/lib/types';
 import { FOOD_CATALOG, CATEGORY_LABELS, FOOD_BY_NAME, nutrientFraction } from '@/lib/foodCatalog';
 import { getStorageTip, xpForConsumed } from '@/lib/features';
-import { parseNaturalLanguagePantry } from '@/lib/ai';
 
 type SortKey = 'expiry' | 'name' | 'category';
 type FilterKey = 'all' | 'critical' | 'soon' | 'stable';
-
-const CAT_ICON: Record<FoodCategory, any> = {
-  leafy_green: { icon: Leaf, color: '#10B981', bg: '#D1FAE5' },
-  root: { icon: Carrot, color: '#F59E0B', bg: '#FEF3C7' },
-  fruit: { icon: Apple, color: '#EF4444', bg: '#FEE2E2' },
-  dairy: { icon: Milk, color: '#3B82F6', bg: '#DBEAFE' },
-  protein: { icon: Beef, color: '#8B5CF6', bg: '#EDE9FE' },
-  grain: { icon: Wheat, color: '#F59E0B', bg: '#FEF3C7' },
-  allium: { icon: Leaf, color: '#6366F1', bg: '#E0E7FF' },
-  fungi: { icon: Package, color: '#8B5CF6', bg: '#EDE9FE' },
-  other: { icon: Package, color: '#6B7280', bg: '#F3F4F6' },
-};
 
 function daysLeft(row: InventoryRow): number {
   if (!row.expires_at) return 999;
@@ -227,52 +211,30 @@ function ItemCard({ row, index, colors, onConsume, onDiscard, onTip }: {
   const tonePill: any = urg === 'critical' ? 'danger' : urg === 'soon' ? 'warning' : 'success';
   const frac = food ? nutrientFraction(food.fragility, Math.max(0, food.shelfLifeDays - d), food.shelfLifeDays) : 1;
 
-  const fadeAnim = useSharedValue(0);
-  const slideAnim = useSharedValue(20);
-  const pulseAnim = useSharedValue(1);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  useRef(() => {
+    slideAnim.setValue(30);
+    Animated.timing(slideAnim, {
+      toValue: 0, duration: 300, delay: index * 50, useNativeDriver: true,
+    }).start();
+  });
 
-  useEffect(() => {
-    fadeAnim.value = withDelay(index * 50, withTiming(1, { duration: 400 }));
-    slideAnim.value = withDelay(index * 50, withTiming(0, { duration: 400 }));
-
-    if (urg === 'critical') {
-      pulseAnim.value = withRepeat(
-        withSequence(
-          withTiming(0.4, { duration: 800 }),
-          withTiming(1, { duration: 800 })
-        ),
-        -1,
-        true
-      );
-    }
-  }, [urg, index]);
-
-  const rStyle = useAnimatedStyle(() => ({
-    opacity: fadeAnim.value,
-    transform: [{ translateY: slideAnim.value }]
-  }));
-
-  const rPulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseAnim.value
-  }));
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  useMemo(() => {
+    Animated.timing(fadeIn, {
+      toValue: 1, duration: 350, delay: index * 60, useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
-    <Animated.View style={rStyle}>
+    <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideAnim }] }}>
       <View style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Freshness stripe */}
-        <Animated.View style={[styles.freshnessStripe, { backgroundColor: toneColor }, urg === 'critical' && rPulseStyle]} />
+        <View style={[styles.freshnessStripe, { backgroundColor: toneColor }]} />
 
         <View style={styles.itemContent}>
           <View style={styles.itemTop}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <View style={[styles.catIconWrap, { backgroundColor: CAT_ICON[row.category].bg }]}>
-                {(() => {
-                  const Icon = CAT_ICON[row.category].icon;
-                  return <Icon size={14} color={CAT_ICON[row.category].color} strokeWidth={2.5} />;
-                })()}
-              </View>
-              <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>{row.name}</Text>
-            </View>
+            <Text style={[styles.itemName, { color: colors.text }]}>{row.name}</Text>
             <Pill tone={tonePill}>{relativeExpiry(row)}</Pill>
           </View>
 
@@ -349,17 +311,20 @@ function AddModal({ visible, onClose, onAdd }: { visible: boolean; onClose: () =
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
-      <View style={styles.modalHeader}>
-        <Text style={[type.h1, { color: colors.text }]}>Add to Pantry</Text>
-        <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
-          <View style={[styles.closeBtn, { borderColor: colors.border }]}>
-            <X size={18} color={colors.subText} strokeWidth={2.5} />
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalSheet, { backgroundColor: colors.bg }]}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <Text style={[type.h1, { color: colors.text }]}>Add to Pantry</Text>
+            <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
+              <View style={[styles.closeBtn, { borderColor: colors.border }]}>
+                <X size={18} color={colors.subText} strokeWidth={2.5} />
+              </View>
+            </PressScale>
           </View>
-        </PressScale>
-      </View>
-      <TextInput
-        style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
+          <TextInput
+            style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
             placeholder="Type or dictate (e.g. '3 apples and milk')"
             placeholderTextColor={colors.subText}
             value={query}
@@ -378,19 +343,21 @@ function AddModal({ visible, onClose, onAdd }: { visible: boolean; onClose: () =
             </PressScale>
           )}
           <ScrollView style={{ maxHeight: 380 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-        {filtered.map((f) => (
-          <PressScale key={f.name} onPress={() => pick(f.name)}>
-            <View style={[styles.suggestRow, { borderBottomColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[type.body, { color: colors.text, fontFamily: font.sansBold }]}>{f.name}</Text>
-                <Text style={[type.bodySm, { color: colors.subText }]}>{CATEGORY_LABELS[f.category]} · Lasts {f.shelfLifeDays} days</Text>
-              </View>
-              <Plus size={16} color={colors.subText} strokeWidth={2.5} />
-            </View>
-          </PressScale>
-        ))}
-      </ScrollView>
-    </BottomSheet>
+            {filtered.map((f) => (
+              <PressScale key={f.name} onPress={() => pick(f.name)}>
+                <View style={[styles.suggestRow, { borderBottomColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.body, { color: colors.text, fontFamily: font.sansBold }]}>{f.name}</Text>
+                    <Text style={[type.bodySm, { color: colors.subText }]}>{CATEGORY_LABELS[f.category]} · Lasts {f.shelfLifeDays} days</Text>
+                  </View>
+                  <Plus size={16} color={colors.subText} strokeWidth={2.5} />
+                </View>
+              </PressScale>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -415,15 +382,18 @@ function TipModal({ row, onClose }: { row: InventoryRow | null; onClose: () => v
   const tip = getStorageTip(row.name);
   const food = FOOD_BY_NAME[row.name.toLowerCase()];
   return (
-    <BottomSheet visible={!!row} onClose={onClose}>
-      <View style={styles.modalHeader}>
-        <Text style={[type.h1, { color: colors.text }]}>{row.name}</Text>
-        <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
-          <View style={[styles.closeBtn, { borderColor: colors.border }]}>
-            <X size={18} color={colors.subText} strokeWidth={2.5} />
+    <Modal visible={!!row} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalSheet, { backgroundColor: colors.bg }]}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <Text style={[type.h1, { color: colors.text }]}>{row.name}</Text>
+            <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
+              <View style={[styles.closeBtn, { borderColor: colors.border }]}>
+                <X size={18} color={colors.subText} strokeWidth={2.5} />
+              </View>
+            </PressScale>
           </View>
-        </PressScale>
-      </View>
 
           {loading ? (
             <View style={{ alignItems: 'center', paddingVertical: spacing[6] }}>
@@ -458,9 +428,11 @@ function TipModal({ row, onClose }: { row: InventoryRow | null; onClose: () => v
                   <NutriBox label="Fiber" value={food ? `${food.fiberG}g` : '-'} colors={colors} />
                 </View>
               </View>
-          </ScrollView>
-        )}
-    </BottomSheet>
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -491,7 +463,6 @@ const styles = StyleSheet.create({
   freshnessStripe:    { width: 5 },
   itemContent:        { flex: 1, padding: spacing[4] },
   itemTop:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  catIconWrap:        { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   itemName:           { fontSize: 16, fontFamily: font.sansBold, flex: 1, marginRight: 8 },
   nutriRow:           { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3] },
   actionRow:          { flexDirection: 'row', marginTop: spacing[3], gap: 8 },

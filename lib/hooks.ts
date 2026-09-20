@@ -1,9 +1,20 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, createContext, useContext, ReactNode } from 'react';
 import { useFocusEffect } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
 import { InventoryRow, ProfileRow, ImpactLogRow, DisposalRow, FoodCategory, Condition } from './types';
 import { FOOD_BY_NAME } from './foodCatalog';
+
+const ProContext = createContext<{ isPro: boolean; setIsPro: (pro: boolean) => void }>({ isPro: false, setIsPro: () => {} });
+
+export function ProProvider({ children }: { children: ReactNode }) {
+  const [isPro, setIsPro] = useState(false);
+  return React.createElement(ProContext.Provider, { value: { isPro, setIsPro } }, children);
+}
+
+export function usePro() {
+  return useContext(ProContext);
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
