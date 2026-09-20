@@ -9,7 +9,7 @@ import { useShoppingList } from '@/lib/hooks';
 import { searchGroceryItems } from '@/lib/ai';
 import { FOOD_CATALOG, CATEGORY_LABELS } from '@/lib/foodCatalog';
 
-export default function ShoppingScreen() {
+export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -334,3 +334,6 @@ const styles = StyleSheet.create({
   searchInput:    { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: font.sans, fontSize: 15, marginBottom: spacing[3] },
   suggestRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderBottomWidth: 1 },
 });
+
+export default function ShoppingScreen() { return <ShoppingView />; }
+

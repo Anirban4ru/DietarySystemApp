@@ -20,7 +20,7 @@ function todayDayIndex(): number {
   return d === 0 ? 6 : d - 1;   // convert to Mon=0
 }
 
-export default function MealPlanScreen() {
+export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { plan, add, remove } = useMealPlan();
@@ -381,3 +381,6 @@ const styles = StyleSheet.create({
   stepRow:        { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 4, gap: 8 },
   searchInput:    { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: font.sans, fontSize: 15, marginBottom: spacing[3] },
 });
+
+export default function MealPlanScreen() { return <MealPlanView />; }
+

@@ -5,7 +5,7 @@ import { ScanLine, Check, Zap, Sun, Moon, ChevronDown, ChevronUp, Barcode, Wand2
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { palette, type, spacing, border } from '@/lib/theme';
+import { palette, type, spacing, border, font } from '@/lib/theme';
 import { GlassPanel, Pill, BrutalButton, PressScale, Loader, useTheme, useToast } from '@/components/ui';
 import { PaywallModal } from '@/components/PaywallModal';
 import { FOOD_CATALOG } from '@/lib/foodCatalog';
@@ -20,7 +20,7 @@ export default function ScannerScreen() {
 
   const { add } = useInventory();
   const { addXp } = useXp();
-  const { isPro } = usePro();
+  const { isPro, useScan, scansRemaining } = usePro();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
@@ -332,6 +332,23 @@ export default function ScannerScreen() {
 }
 
 const styles = StyleSheet.create({
+  proScanBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  proScanBannerText: {
+    fontSize: 11,
+    fontFamily: font.sansBold,
+    color: palette.chalk,
+    letterSpacing: 0.6,
+  },
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing[6] },
   permissionCard: { alignItems: 'center', width: '90%', maxWidth: 400, borderRadius: 24, padding: spacing[6], shadowColor: palette.ink, shadowOpacity: 0.1, shadowRadius: 16, elevation: 5 },
@@ -353,3 +370,5 @@ const styles = StyleSheet.create({
   freshnessRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing[4] },
   actionRow: { flexDirection: 'row', gap: 12, marginTop: spacing[5] },
 });
+
+

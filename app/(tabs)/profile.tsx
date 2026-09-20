@@ -1,3 +1,7 @@
+import { useRouter } from 'expo-router';
+import { Crown, Leaf, ChevronRight, Sparkles } from 'lucide-react-native';
+import { usePro } from '@/lib/hooks';
+import { PaywallModal } from '@/components/PaywallModal';
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { User, Check, Sun, Moon, LogOut, Trash2, ChevronDown, ChevronUp, Activity } from 'lucide-react-native';
@@ -33,6 +37,9 @@ export default function ProfileScreen() {
   });
   const [saved, setSaved] = useState(false);
   const [goalsExpanded, setGoalsExpanded] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const { isPro } = usePro();
+  const router = useRouter();
 
   useMemo(() => {
     if (profile) {
@@ -303,8 +310,60 @@ export default function ProfileScreen() {
           <Text style={[type.label, { color: palette.chalk }]}>{saved ? '✓ SAVED!' : 'SAVE PROFILE'}</Text>
         </BrutalButton>
 
+        {/* ── Impact & Sustainability Hub ── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/impact')}
+          style={[styles.hubCard, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing[5] }]}
+        >
+          <View style={[styles.hubIconBg, { backgroundColor: palette.sageDeep + '15' }]}>
+            <Leaf size={22} color={palette.sageDeep} strokeWidth={2.5} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.hubTitle, { color: colors.text }]}>Sustainability & Impact Hub</Text>
+            <Text style={[styles.hubSub, { color: colors.subText }]}>
+              {summary.totalCo2eAvoided.toFixed(1)}kg CO₂ avoided · View leaderboard & badges →
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.subText} />
+        </TouchableOpacity>
+
+        {/* ── Nourish+ Pro Membership ── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setShowPaywall(true)}
+          style={[
+            styles.hubCard,
+            {
+              backgroundColor: isPro ? 'rgba(245, 158, 11, 0.08)' : colors.surface,
+              borderColor: isPro ? palette.amber : colors.border,
+              marginTop: spacing[3],
+            }
+          ]}
+        >
+          <View style={[styles.hubIconBg, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+            <Crown size={22} color={palette.amberDeep} strokeWidth={2.5} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.hubTitle, { color: colors.text }]}>
+                {isPro ? 'Nourish+ Pro Active' : 'Upgrade to Nourish+ Pro'}
+              </Text>
+              {isPro && (
+                <View style={styles.proActiveBadge}>
+                  <Text style={styles.proActiveBadgeText}>VIP</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.hubSub, { color: colors.subText }]}>
+              {isPro ? 'All clinical AI features & unlimited scans unlocked' : 'Unlock unlimited AI vision, clinical swaps & more →'}
+            </Text>
+          </View>
+          <ChevronRight size={18} color={palette.amberDeep} />
+        </TouchableOpacity>
+
         {/* ── Account Actions ── */}
-        <View style={[styles.accountBox, { borderColor: colors.border }]}>
+        <View style={[styles.accountBox, { borderColor: colors.border, marginTop: spacing[4] }]}>
           <Text style={[styles.accountLabel, { color: colors.subText }]}>ACCOUNT</Text>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -324,6 +383,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
     </View>
   );
 }
@@ -386,6 +446,41 @@ function MicroCell({ label, value, colors }: { label: string; value: string; col
 /* ─── Styles ─────────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
+  hubCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing[4],
+    borderRadius: 16,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  hubIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hubTitle: {
+    fontSize: 15,
+    fontFamily: font.sansBold,
+  },
+  hubSub: {
+    fontSize: 12,
+    fontFamily: font.sans,
+    marginTop: 2,
+  },
+  proActiveBadge: {
+    backgroundColor: palette.amber,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  proActiveBadgeText: {
+    fontSize: 9,
+    fontFamily: font.sansBold,
+    color: '#000',
+  },
   container:        { flex: 1 },
   scroll:           { flex: 1, paddingHorizontal: spacing[4] },
 
@@ -464,3 +559,4 @@ const styles = StyleSheet.create({
   accountRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1 },
   accountRowText:   { fontSize: 15, fontFamily: font.sansBold },
 });
+

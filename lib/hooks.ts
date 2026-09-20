@@ -1,15 +1,73 @@
-import React, { useState, useCallback, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useCallback, createContext, useContext, ReactNode, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
 import { InventoryRow, ProfileRow, ImpactLogRow, DisposalRow, FoodCategory, Condition } from './types';
 import { FOOD_BY_NAME } from './foodCatalog';
 
-const ProContext = createContext<{ isPro: boolean; setIsPro: (pro: boolean) => void }>({ isPro: false, setIsPro: () => {} });
+export interface ProContextType {
+  isPro: boolean;
+  setIsPro: (pro: boolean) => void;
+  unlockPro: () => Promise<void>;
+  resetPro: () => Promise<void>;
+  scansRemaining: number;
+  useScan: () => Promise<boolean>;
+}
+
+const ProContext = createContext<ProContextType>({
+  isPro: false,
+  setIsPro: () => {},
+  unlockPro: async () => {},
+  resetPro: async () => {},
+  scansRemaining: 3,
+  useScan: async () => true,
+});
 
 export function ProProvider({ children }: { children: ReactNode }) {
-  const [isPro, setIsPro] = useState(false);
-  return React.createElement(ProContext.Provider, { value: { isPro, setIsPro } }, children);
+  const [isPro, setIsProState] = useState(false);
+  const [scansUsed, setScansUsed] = useState(0);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@nourish_is_pro').then((val) => {
+      if (val === 'true') setIsProState(true);
+    });
+    AsyncStorage.getItem('@nourish_scans_used').then((val) => {
+      if (val) setScansUsed(parseInt(val, 10) || 0);
+    });
+  }, []);
+
+  const setIsPro = (val: boolean) => {
+    setIsProState(val);
+    AsyncStorage.setItem('@nourish_is_pro', val ? 'true' : 'false');
+  };
+
+  const unlockPro = async () => {
+    setIsProState(true);
+    await AsyncStorage.setItem('@nourish_is_pro', 'true');
+  };
+
+  const resetPro = async () => {
+    setIsProState(false);
+    await AsyncStorage.setItem('@nourish_is_pro', 'false');
+  };
+
+  const scansRemaining = isPro ? 9999 : Math.max(0, 3 - scansUsed);
+
+  const useScan = async (): Promise<boolean> => {
+    if (isPro) return true;
+    if (scansUsed >= 3) return false;
+    const next = scansUsed + 1;
+    setScansUsed(next);
+    await AsyncStorage.setItem('@nourish_scans_used', String(next));
+    return true;
+  };
+
+  return React.createElement(
+    ProContext.Provider,
+    { value: { isPro, setIsPro, unlockPro, resetPro, scansRemaining, useScan } },
+    children
+  );
 }
 
 export function usePro() {
@@ -414,3 +472,5 @@ export function useXp() {
 
   return { xp, loading, addXp };
 }
+
+

@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Boxes, ChefHat, User, ScanLine, Calendar, ShoppingCart, Leaf } from 'lucide-react-native';
+import { Home, Boxes, ChefHat, User } from 'lucide-react-native';
 import { useTheme } from '@/components/ui';
 import { palette } from '@/lib/theme';
 import { useInventory } from '@/lib/hooks';
@@ -18,7 +18,7 @@ export default function TabLayout() {
   // Count items expiring within 3 days for badge
   const urgentCount = items.filter((i) => daysLeft(i.expires_at) <= 3 && daysLeft(i.expires_at) >= 0).length;
 
-  const tabBarHeight = 56 + insets.bottom;
+  const tabBarHeight = 58 + Math.max(insets.bottom, 10);
 
   return (
     <Tabs
@@ -27,19 +27,23 @@ export default function TabLayout() {
         tabBarActiveTintColor: mode === 'dark' ? palette.sageMist : palette.sageDeep,
         tabBarInactiveTintColor: colors.subText,
         tabBarStyle: {
-          backgroundColor: colors.bg,
-          borderTopWidth: 1.5,
-          borderTopColor: mode === 'dark' ? palette.darkBorder : palette.hair,
+          backgroundColor: mode === 'dark' ? '#111813' : '#F9FBF9',
+          borderTopWidth: 1,
+          borderTopColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
           height: tabBarHeight,
-          paddingBottom: insets.bottom || 8,
-          paddingTop: 6,
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingTop: 8,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: mode === 'dark' ? 0.3 : 0.05,
+          shadowRadius: 12,
         },
         tabBarLabelStyle: {
-          fontSize: 9,
+          fontSize: 10,
           fontFamily: 'Inter-Bold',
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-          marginTop: 2,
+          letterSpacing: 0.6,
+          marginTop: 4,
         },
         tabBarIconStyle: {
           marginTop: 2,
@@ -50,17 +54,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size - 2} strokeWidth={2.5} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Home color={color} size={focused ? 24 : 22} strokeWidth={focused ? 2.6 : 2} />
+          ),
         }}
       />
       <Tabs.Screen
         name="inventory"
         options={{
           title: 'Pantry',
-          tabBarIcon: ({ color, size }) => <Boxes color={color} size={size - 2} strokeWidth={2.5} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Boxes color={color} size={focused ? 24 : 22} strokeWidth={focused ? 2.6 : 2} />
+          ),
           tabBarBadge: urgentCount > 0 ? urgentCount : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: palette.danger,
+            backgroundColor: palette.crimson,
             color: palette.chalk,
             fontSize: 10,
             fontFamily: 'Inter-Bold',
@@ -74,39 +82,39 @@ export default function TabLayout() {
       <Tabs.Screen
         name="recipes"
         options={{
-          title: 'Rescue',
-          tabBarIcon: ({ color, size }) => <ChefHat color={color} size={size - 2} strokeWidth={2.5} />,
-        }}
-      />
-      <Tabs.Screen
-        name="plan"
-        options={{
-          title: 'Plan',
-          tabBarIcon: ({ color, size }) => <Calendar color={color} size={size - 2} strokeWidth={2.5} />,
-        }}
-      />
-      <Tabs.Screen
-        name="shopping"
-        options={{
-          title: 'Shop',
-          tabBarIcon: ({ color, size }) => <ShoppingCart color={color} size={size - 2} strokeWidth={2.5} />,
-        }}
-      />
-      <Tabs.Screen
-        name="impact"
-        options={{
-          title: 'Impact',
-          tabBarIcon: ({ color, size }) => <Leaf color={color} size={size - 2} strokeWidth={2.5} />,
+          title: 'Kitchen',
+          tabBarIcon: ({ color, focused }) => (
+            <ChefHat color={color} size={focused ? 24 : 22} strokeWidth={focused ? 2.6 : 2} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size - 2} strokeWidth={2.5} />,
+          tabBarIcon: ({ color, focused }) => (
+            <User color={color} size={focused ? 24 : 22} strokeWidth={focused ? 2.6 : 2} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="plan"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="shopping"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="impact"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
   );
 }
-

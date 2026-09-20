@@ -1,3 +1,4 @@
+import { ShoppingView } from './shopping';
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
@@ -56,6 +57,7 @@ export default function InventoryScreen() {
   const [sort, setSort] = useState<SortKey>('expiry');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [showControls, setShowControls] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pantry' | 'grocery'>('pantry');
 
   const sorted = useMemo(() => {
     let list = [...items];
@@ -447,6 +449,24 @@ function NutriBox({ label, value, colors }: { label: string; value: any; colors:
 
 const styles = StyleSheet.create({
   container:          { flex: 1 },
+  segmentContainer: {
+    flexDirection: 'row',
+    marginHorizontal: spacing[4],
+    marginBottom: spacing[3],
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  segmentText: {
+    fontSize: 13,
+  },
   scroll:             { flex: 1, paddingHorizontal: spacing[4] },
   headerRow:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[3] },
   screenTitle:        { fontSize: 28, fontFamily: font.sansBold, letterSpacing: -0.5 },
@@ -481,3 +501,4 @@ const styles = StyleSheet.create({
   stepRow:            { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   ingDot:             { width: 8, height: 8, borderRadius: 4 },
 });
+

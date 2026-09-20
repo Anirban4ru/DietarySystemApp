@@ -1,3 +1,4 @@
+import { MealPlanView } from './plan';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -41,6 +42,7 @@ export default function RecipesScreen() {
   const [rouletteLoading, setRouletteLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'pantry' | 'vault'>('pantry');
   const [vaultRecipes, setVaultRecipes] = useState<RecipeCandidate[]>([]);
+  const [mainTab, setMainTab] = useState<'recipes' | 'plan'>('recipes');
 
   useFocusEffect(
     useCallback(() => {
@@ -143,12 +145,45 @@ export default function RecipesScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.bg }]}
-      contentContainerStyle={{ paddingBottom: 120, paddingTop: insets.top + 8 }}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top + 8 }}>
+      {/* Top Segmented Switcher: Recipes vs Meal Plan */}
+      <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[
+            styles.segmentBtn,
+            mainTab === 'recipes' && { backgroundColor: palette.sageDeep }
+          ]}
+          onPress={() => { Haptics.selectionAsync(); setMainTab('recipes'); }}
+        >
+          <Text style={[styles.segmentText, { color: mainTab === 'recipes' ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>
+            🍳 AI Rescue Recipes
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[
+            styles.segmentBtn,
+            mainTab === 'plan' && { backgroundColor: palette.sageDeep }
+          ]}
+          onPress={() => { Haptics.selectionAsync(); setMainTab('plan'); }}
+        >
+          <Text style={[styles.segmentText, { color: mainTab === 'plan' ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>
+            📅 Weekly Meal Plan
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {mainTab === 'plan' ? (
+        <MealPlanView embedded={true} />
+      ) : (
+        <ScrollView
+          style={[styles.container, { backgroundColor: colors.bg }]}
+          contentContainerStyle={{ paddingBottom: 120, paddingTop: 6 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -249,6 +284,8 @@ export default function RecipesScreen() {
 
       <RecipeDetail c={detail} onClose={() => setDetail(null)} onCook={cook} onShop={addToShopping} colors={colors} />
     </ScrollView>
+    )}
+    </View>
   );
 }
 
@@ -562,6 +599,25 @@ function NutriBox({ label, value, colors }: { label: string; value: any; colors:
 }
 
 const styles = StyleSheet.create({
+  segmentContainer: {
+    flexDirection: 'row',
+    marginHorizontal: spacing[4],
+    marginBottom: spacing[3],
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  segmentText: {
+    fontSize: 13,
+  },
+
   container:        { flex: 1 },
   header:           { paddingHorizontal: spacing[4], marginBottom: spacing[3] },
   screenTitle:      { fontSize: 28, fontFamily: font.sansBold, letterSpacing: -0.5 },
