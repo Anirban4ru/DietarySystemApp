@@ -208,17 +208,17 @@ export function PaywallModal({
                 ]}
                 onPress={() => { Haptics.selectionAsync(); setSelectedPlan('annual'); }}
                 accessibilityRole="radio"
-                accessibilityLabel="Annual plan: $3.33 per month, billed $39.99 per year"
+                accessibilityLabel="Annual plan: Rs 167 per month, billed Rs 1999 per year"
                 accessibilityState={{ selected: selectedPlan === 'annual' }}
               >
                 <View style={styles.bestValueBadge}>
-                  <Text style={styles.bestValueBadgeText}>SAVE 50% • RECOMMENDED</Text>
+                  <Text style={styles.bestValueBadgeText}>SAVE 50% • BEST VALUE</Text>
                 </View>
                 <Text style={[styles.planPeriod, { color: colors.text }]}>Annual</Text>
                 <Text style={[styles.planPrice, { color: palette.amberDeep }]}>
-                  $3.33 <Text style={styles.planPerMo}>/ mo</Text>
+                  {'₹'}167 <Text style={styles.planPerMo}>/ mo</Text>
                 </Text>
-                <Text style={[styles.planBilled, { color: colors.subText }]}>Billed $39.99/yr</Text>
+                <Text style={[styles.planBilled, { color: colors.subText }]}>Billed {'₹'}1,999/yr</Text>
               </TouchableOpacity>
 
               {/* Monthly Plan */}
@@ -234,12 +234,12 @@ export function PaywallModal({
                 ]}
                 onPress={() => { Haptics.selectionAsync(); setSelectedPlan('monthly'); }}
                 accessibilityRole="radio"
-                accessibilityLabel="Monthly plan: $6.99 per month, cancel anytime"
+                accessibilityLabel="Monthly plan: Rs 299 per month, cancel anytime"
                 accessibilityState={{ selected: selectedPlan === 'monthly' }}
               >
                 <Text style={[styles.planPeriod, { color: colors.text, marginTop: 14 }]}>Monthly</Text>
                 <Text style={[styles.planPrice, { color: colors.text }]}>
-                  $6.99 <Text style={styles.planPerMo}>/ mo</Text>
+                  {'₹'}299 <Text style={styles.planPerMo}>/ mo</Text>
                 </Text>
                 <Text style={[styles.planBilled, { color: colors.subText }]}>Billed monthly</Text>
               </TouchableOpacity>
@@ -295,7 +295,7 @@ export function PaywallModal({
                 label={
                   state === 'purchasing' ? 'Securing Access...' :
                   enableTrial ? 'Start 7-Day Free Trial' :
-                  `Subscribe for ${selectedPlan === 'annual' ? '$39.99/yr' : '$6.99/mo'}`
+                  `Subscribe for ${selectedPlan === 'annual' ? '\u20b91,999/yr' : '\u20b9299/mo'}`
                 }
                 onPress={handleUpgrade}
                 loading={state === 'purchasing'}
@@ -323,9 +323,9 @@ export function PaywallModal({
             {/* Legal & Renewal Terms */}
             <Text style={[styles.termsText, { color: colors.subText }]}>
               {enableTrial
-                ? 'After 7 days, your subscription will renew automatically at the selected price unless cancelled at least 24 hours before the trial ends. '
-                : 'Your subscription renews automatically unless cancelled at least 24 hours before the end of the current period. '}
-              Payment will be charged to your App Store or Google Play account. Manage or cancel anytime in account settings.
+                ? 'After 7 days, your subscription renews automatically at the selected price unless cancelled 24 hours before trial ends. '
+                : 'Your subscription renews automatically unless cancelled 24 hours before the end of the current period. '}
+              Payment charged via Google Play or App Store. Made in India with love. Cancel anytime in settings.
             </Text>
           </ScrollView>
         </View>

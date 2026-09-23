@@ -317,7 +317,7 @@ export default function ProfileScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={[styles.proPlanTitle, { color: colors.text }]}>
                   {isPro
-                    ? `Nourish+ Pro (${subscriptionPlan === 'annual' ? 'Annual' : 'Monthly'})`
+                    ? `Nourish+ Pro (${subscriptionPlan === 'annual' ? 'Annual — ₹1,999/yr' : 'Monthly — ₹299/mo'})`
                     : 'Nourish Free Tier'}
                 </Text>
                 <StatusBadge

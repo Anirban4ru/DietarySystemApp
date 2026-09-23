@@ -34,41 +34,73 @@ export interface OptimizerWeights {
   completeness: number; // 0..1
 }
 
-// Template recipes — ingredient lists scaled by grams.
-// The optimizer selects templates, scales them, and scores against inventory + RDA.
+// Indian Recipe Templates — ingredient lists scaled by grams.
+// The optimizer selects templates, scores against inventory + RDA.
 const TEMPLATES: { name: string; base: { name: string; grams: number }[] }[] = [
-  { name: 'Rescue Stir-Fry', base: [
-    { name: 'Tofu', grams: 150 }, { name: 'Spinach', grams: 120 }, { name: 'Mushroom', grams: 100 },
-    { name: 'Onion', grams: 80 }, { name: 'Garlic', grams: 15 }, { name: 'Brown Rice', grams: 80 },
-  { name: 'Carrot', grams: 80 },
+  { name: 'Dal Tadka', base: [
+    { name: 'Toor Dal', grams: 150 }, { name: 'Tamatar', grams: 100 },
+    { name: 'Pyaaz', grams: 80 }, { name: 'Lehsun', grams: 15 },
+    { name: 'Adrak', grams: 10 }, { name: 'Ghee', grams: 15 },
+    { name: 'Chawal', grams: 120 },
   ]},
-  { name: 'Green Power Bowl', base: [
-    { name: 'Kale', grams: 100 }, { name: 'Quinoa', grams: 90 }, { name: 'Avocado', grams: 80 },
-    { name: 'Chickpeas', grams: 120 }, { name: 'Lemon', grams: 30 }, { name: 'Carrot', grams: 70 },
+  { name: 'Palak Paneer', base: [
+    { name: 'Palak', grams: 200 }, { name: 'Paneer', grams: 150 },
+    { name: 'Tamatar', grams: 80 }, { name: 'Pyaaz', grams: 60 },
+    { name: 'Lehsun', grams: 15 }, { name: 'Adrak', grams: 10 },
+    { name: 'Ghee', grams: 15 }, { name: 'Chawal', grams: 100 },
   ]},
-  { name: 'Hearty Lentil Stew', base: [
-    { name: 'Lentils', grams: 120 }, { name: 'Carrot', grams: 100 }, { name: 'Onion', grams: 90 },
-    { name: 'Garlic', grams: 15 }, { name: 'Tomato', grams: 120 }, { name: 'Spinach', grams: 80 },
+  { name: 'Aloo Gobi Sabzi', base: [
+    { name: 'Aloo', grams: 200 }, { name: 'Tamatar', grams: 100 },
+    { name: 'Pyaaz', grams: 80 }, { name: 'Lehsun', grams: 15 },
+    { name: 'Hari Mirch', grams: 20 }, { name: 'Adrak', grams: 10 },
+    { name: 'Gehu Atta', grams: 120 },
   ]},
-  { name: 'Protein Scramble', base: [
-    { name: 'Eggs', grams: 150 }, { name: 'Spinach', grams: 80 }, { name: 'Tomato', grams: 80 },
-    { name: 'Onion', grams: 60 }, { name: 'Whole Wheat Bread', grams: 60 },
+  { name: 'Rajma Chawal', base: [
+    { name: 'Rajma', grams: 150 }, { name: 'Tamatar', grams: 120 },
+    { name: 'Pyaaz', grams: 100 }, { name: 'Lehsun', grams: 15 },
+    { name: 'Adrak', grams: 15 }, { name: 'Chawal', grams: 150 },
+    { name: 'Ghee', grams: 10 },
   ]},
-  { name: 'Roasted Root Plate', base: [
-    { name: 'Sweet Potato', grams: 200 }, { name: 'Beetroot', grams: 120 }, { name: 'Carrot', grams: 100 },
-    { name: 'Onion', grams: 80 }, { name: 'Garlic', grams: 15 }, { name: 'Greek Yogurt', grams: 80 },
+  { name: 'Moong Dal Khichdi', base: [
+    { name: 'Moong Dal', grams: 100 }, { name: 'Chawal', grams: 100 },
+    { name: 'Gajar', grams: 80 }, { name: 'Pyaaz', grams: 60 },
+    { name: 'Adrak', grams: 10 }, { name: 'Ghee', grams: 20 },
   ]},
-  { name: 'Mediterranean Salad', base: [
-    { name: 'Tomato', grams: 150 }, { name: 'Lettuce', grams: 100 }, { name: 'Onion', grams: 60 },
-    { name: 'Lemon', grams: 30 }, { name: 'Chickpeas', grams: 120 }, { name: 'Avocado', grams: 70 },
+  { name: 'Methi Paratha', base: [
+    { name: 'Methi', grams: 100 }, { name: 'Gehu Atta', grams: 150 },
+    { name: 'Pyaaz', grams: 60 }, { name: 'Dahi', grams: 80 },
+    { name: 'Hari Mirch', grams: 15 }, { name: 'Lehsun', grams: 10 },
   ]},
-  { name: 'Chicken & Greens', base: [
-    { name: 'Chicken Breast', grams: 150 }, { name: 'Kale', grams: 100 }, { name: 'Garlic', grams: 15 },
-    { name: 'Sweet Potato', grams: 150 }, { name: 'Lemon', grams: 30 },
+  { name: 'Egg Bhurji', base: [
+    { name: 'Eggs', grams: 180 }, { name: 'Tamatar', grams: 80 },
+    { name: 'Pyaaz', grams: 70 }, { name: 'Hari Mirch', grams: 15 },
+    { name: 'Adrak', grams: 10 }, { name: 'Gehu Atta', grams: 120 },
   ]},
-  { name: 'Overnight Oats', base: [
-    { name: 'Oats', grams: 80 }, { name: 'Milk', grams: 200 }, { name: 'Banana', grams: 120 },
-    { name: 'Apple', grams: 100 },
+  { name: 'Poha Upma', base: [
+    { name: 'Poha', grams: 120 }, { name: 'Pyaaz', grams: 60 },
+    { name: 'Tamatar', grams: 80 }, { name: 'Hari Mirch', grams: 10 },
+    { name: 'Curry Leaves', grams: 5 }, { name: 'Dahi', grams: 80 },
+  ]},
+  { name: 'Masoor Dal Soup', base: [
+    { name: 'Masoor Dal', grams: 120 }, { name: 'Tamatar', grams: 100 },
+    { name: 'Spinach', grams: 80 }, { name: 'Pyaaz', grams: 80 },
+    { name: 'Lehsun', grams: 15 }, { name: 'Adrak', grams: 10 },
+  ]},
+  { name: 'Shakarkandi Chaat', base: [
+    { name: 'Shakarkandi', grams: 200 }, { name: 'Tamatar', grams: 60 },
+    { name: 'Pyaaz', grams: 40 }, { name: 'Hari Mirch', grams: 15 },
+    { name: 'Lemon', grams: 30 }, { name: 'Dahi', grams: 80 },
+  ]},
+  { name: 'Chicken Curry', base: [
+    { name: 'Chicken', grams: 200 }, { name: 'Tamatar', grams: 150 },
+    { name: 'Pyaaz', grams: 100 }, { name: 'Lehsun', grams: 20 },
+    { name: 'Adrak', grams: 15 }, { name: 'Dahi', grams: 80 },
+    { name: 'Chawal', grams: 120 },
+  ]},
+  { name: 'Paneer Bhurji', base: [
+    { name: 'Paneer', grams: 150 }, { name: 'Tamatar', grams: 80 },
+    { name: 'Pyaaz', grams: 70 }, { name: 'Shimla Mirch', grams: 60 },
+    { name: 'Adrak', grams: 10 }, { name: 'Gehu Atta', grams: 120 },
   ]},
 ];
 
