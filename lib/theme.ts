@@ -16,6 +16,7 @@ export const palette = {
   // ── Signature Forest Greens (fresh herbs, nature) ─────────────
   sage:         '#3D6B35',    // Forest green
   sageDeep:     '#1E4D18',    // Deep forest
+  forestDeep:   '#1E4D18',    // Semantic deep forest green
   sageMist:     '#EDF5EB',    // Mint tint
 
   // ── Saffron / Amber (warmth, spice, richness) ─────────────────
@@ -23,9 +24,11 @@ export const palette = {
   clayDeep:     '#92400E',    // Deep amber / burnished copper
   amber:        '#D97706',    // Saffron gold
   amberDeep:    '#B45309',    // Rich saffron
+  saffron:      '#D97706',    // Rich saffron attention color
 
   // ── Burgundy / Crimson (sophistication, danger) ───────────────
   crimson:      '#991B1B',    // Deep burgundy
+  burgundy:     '#991B1B',    // Semantic burgundy for urgent/destructive states
   crimsonMist:  '#FEE2E2',    // Soft blush
 
   // ── Semantic ──────────────────────────────────────────────────
@@ -72,6 +75,7 @@ export const font = {
   sansBold:    'Inter-Bold',
   display:     'SpaceGrotesk-Bold',
   displayReg:  'SpaceGrotesk-Regular',
+  monoBold:    'SpaceGrotesk-Bold',
 } as const;
 
 export const type = {
@@ -117,6 +121,15 @@ export const type = {
     fontFamily: font.sansBold,
     fontSize: 11,
     letterSpacing: 1.5,
+    textTransform: 'uppercase' as any,
+    fontWeight: '700' as any,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  labelSm: {
+    fontFamily: font.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.2,
     textTransform: 'uppercase' as any,
     fontWeight: '700' as any,
     includeFontPadding: false,

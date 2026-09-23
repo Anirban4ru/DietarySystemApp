@@ -9,18 +9,17 @@ import {
   SpaceGrotesk_400Regular, SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider, ToastProvider, SplashOverlay, useTheme } from '@/components/ui';
 import { ProProvider } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import {
-  registerForPushNotifications,
-  scheduleDailyMealReminder,
-  scheduleDailyShoppingReminder,
+  getNotificationPreferences,
+  syncScheduledNotifications,
 } from '@/lib/notifications';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
+import { PaywallModal } from '@/components/PaywallModal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,13 +50,10 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Register push notifications
+  // Sync scheduled reminders safely according to stored preferences
   useEffect(() => {
-    registerForPushNotifications().then((token) => {
-      if (token) {
-        scheduleDailyMealReminder();
-        scheduleDailyShoppingReminder();
-      }
+    getNotificationPreferences().then((prefs) => {
+      syncScheduledNotifications(prefs);
     });
   }, []);
 
@@ -68,13 +64,10 @@ export default function RootLayout() {
 
     SplashScreen.hideAsync();
 
-    // Give animated splash a moment to show
     const timer = setTimeout(() => setAppReady(true), 100);
 
-    const inTabsGroup = segments[0] === '(tabs)';
-    if (!session && inTabsGroup) {
-      router.replace('/login');
-    } else if (session && !inTabsGroup) {
+    // Only redirect to tabs if user is actively on the login screen and has a valid session
+    if (session && segments[0] === 'login') {
       router.replace('/(tabs)');
     }
 
@@ -88,6 +81,7 @@ export default function RootLayout() {
       <ToastProvider>
         <ProProvider>
           <AppContent />
+          <PaywallModal />
         </ProProvider>
         <UpdateOverlay />
         {/* Animated splash overlay — hides once appReady */}
@@ -111,4 +105,3 @@ function AppContent() {
     </>
   );
 }
-

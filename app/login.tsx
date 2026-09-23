@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, AppState, Image, Platform, Animated, Dimensions, Easing } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert, AppState, Image, Platform, Animated, Dimensions, Easing, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { PressScale, useToast } from '@/components/ui';
 import { type, spacing, palette, font } from '@/lib/theme';
@@ -19,6 +21,7 @@ AppState.addEventListener('change', (state) => {
 });
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -95,6 +98,18 @@ export default function LoginScreen() {
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
 
+      {/* Top Close Button for guests / returning users */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => router.replace('/(tabs)')}
+          style={styles.closeBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Continue as guest"
+        >
+          <X size={20} color={palette.chalk} />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.header}>
         <View style={styles.iconWrap}>
           <Image source={require('../assets/icon.png')} style={{ width: 80, height: 80, borderRadius: 24 }} />
@@ -135,6 +150,21 @@ export default function LoginScreen() {
             <Text style={[styles.btnText, { color: palette.sageDeep }]}>SIGN IN</Text>
           </PressScale>
         </View>
+
+        {/* Guest Access Option */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <PressScale
+          onPress={() => router.replace('/(tabs)')}
+          disabled={loading}
+          style={styles.btnGuest}
+        >
+          <Text style={styles.btnGuestText}>CONTINUE AS GUEST</Text>
+        </PressScale>
       </View>
 
       {/* Expanding Transition Overlay */}
@@ -224,10 +254,59 @@ const styles = StyleSheet.create({
     color: palette.chalk,
     backgroundColor: 'rgba(0,0,0,0.15)',
   },
+  topBar: {
+    position: 'absolute',
+    top: 48,
+    left: spacing[6],
+    right: spacing[6],
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    zIndex: 10,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonRow: {
     flexDirection: 'row',
     gap: spacing[3],
-    marginTop: spacing[8],
+    marginTop: spacing[6],
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing[4],
+    gap: spacing[3],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  dividerText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontFamily: font.sansBold,
+    fontSize: 11,
+    letterSpacing: 2,
+  },
+  btnGuest: {
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnGuestText: {
+    fontFamily: font.sansBold,
+    fontSize: 13,
+    color: palette.chalk,
+    letterSpacing: 1.2,
   },
   btn: {
     flex: 1,

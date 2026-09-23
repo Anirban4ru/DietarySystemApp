@@ -1,13 +1,5 @@
-import { useEffect } from 'react';
-
-declare global {
-  interface Window {
-    frameworkReady?: () => void;
-  }
-}
-
+// Standalone app compatibility hook
 export function useFrameworkReady() {
-  useEffect(() => {
-    window.frameworkReady?.();
-  });
+  // Safe no-op in standalone production builds
 }
+

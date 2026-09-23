@@ -1,86 +1,199 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView,
-  Dimensions, Switch
+  Dimensions, Switch, ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import {
   Crown, Sparkles, Check, X, ShieldCheck, Zap,
-  Star, Lock, HeartHandshake, ArrowRight
+  Lock, RefreshCw, AlertCircle, CheckCircle2, ArrowRight
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
-import { useTheme, BrutalButton, GlassPanel, useToast } from '@/components/ui';
-import { usePro } from '@/lib/hooks';
+import { useTheme, SurfaceCard, PrimaryAction, SecondaryAction, useToast } from '@/components/ui';
+import { usePro, ProEntitlement } from '@/lib/hooks';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-export function PaywallModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+const FEATURE_DESCRIPTIONS: Record<ProEntitlement, { name: string; desc: string; preview: string }> = {
+  unlimited_scans: {
+    name: 'Unlimited AI Scans',
+    desc: 'Scan pantry items, barcodes, and groceries without limits.',
+    preview: 'Real-time multi-angle computer vision classification active',
+  },
+  advanced_receipt_processing: {
+    name: 'Advanced Receipt Scanning',
+    desc: 'Parse complex grocery store receipts into individual pantry items automatically.',
+    preview: 'Multi-item line-item breakdown with instant expiry mapping',
+  },
+  macro_targets: {
+    name: 'Clinical Macro & Micronutrient Engine',
+    desc: 'Track daily Protein, Carbs, Fats, Fiber, and micronutrients customized to your metabolic profile.',
+    preview: 'Daily RDA calculation, real-time deficit alerts & macro budgets',
+  },
+  smart_substitutions: {
+    name: 'Smart Pantry Ingredient Substitutions',
+    desc: 'Substitute missing recipe ingredients with items already inside your pantry.',
+    preview: 'Dynamic swap suggestions save $40+ per week in unnecessary grocery trips',
+  },
+  household_pantry: {
+    name: 'Household & Shared Pantry Sync',
+    desc: 'Keep your entire family or roommates in sync with real-time updates.',
+    preview: 'Instant synchronization across devices with shared shopping list',
+  },
+  advanced_impact_analytics: {
+    name: 'Advanced Environmental Analytics',
+    desc: 'Track lifetime carbon avoidance, methane reduction curves, and annual dollar savings.',
+    preview: 'Monthly and yearly trajectory forecasting with milestone reporting',
+  },
+  waste_pattern_insights: {
+    name: 'Predictive Waste Pattern Insights',
+    desc: 'AI predicts which foods spoil fastest in your fridge and schedules rescue recipes.',
+    preview: 'Spanned degradation timeline with preventative alerts',
+  },
+  clinical_meal_plans: {
+    name: 'Personalized Clinical Meal Plans',
+    desc: 'AI-generated weekly meal plans based on your medical conditions, preferences, and expiring pantry.',
+    preview: 'Condition-safe recipes (diabetes, celiac, hypertension, lactose)',
+  },
+};
+
+interface PaywallModalProps {
+  visible?: boolean;
+  onClose?: () => void;
+  feature?: ProEntitlement | null;
+}
+
+export function PaywallModal({
+  visible: controlledVisible,
+  onClose: controlledOnClose,
+  feature: targetFeature,
+}: PaywallModalProps) {
   const { colors, mode } = useTheme();
-  const { isPro, unlockPro, resetPro } = usePro();
+  const {
+    isPro,
+    unlockPro,
+    activeFeaturePaywall,
+    closePaywall,
+  } = usePro();
   const toast = useToast();
 
-  const [loading, setLoading] = useState(false);
+  const isVisible = controlledVisible !== undefined ? controlledVisible : Boolean(activeFeaturePaywall);
+  const handleClose = controlledOnClose ?? closePaywall;
+  const currentFeature = targetFeature ?? activeFeaturePaywall;
+
+  const [state, setState] = useState<'idle' | 'purchasing' | 'restoring' | 'success' | 'error'>('idle');
   const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
   const [enableTrial, setEnableTrial] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (!visible) return null;
+  if (!isVisible) return null;
 
   const handleUpgrade = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setLoading(true);
-    setTimeout(async () => {
-      await unlockPro();
-      setLoading(false);
-      toast.show('🎉 Welcome to Nourish+ Pro! All features unlocked.', 'success');
-      onClose();
-    }, 1200);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setState('purchasing');
+    setErrorMessage(null);
+
+    try {
+      // Simulate real subscription transaction
+      await new Promise((res) => setTimeout(res, 1400));
+      await unlockPro(selectedPlan);
+      setState('success');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show('Welcome to Nourish+ Pro! All features unlocked.', 'success');
+      setTimeout(() => {
+        setState('idle');
+        handleClose();
+      }, 900);
+    } catch (e: any) {
+      setState('error');
+      setErrorMessage(e.message || 'Subscription processing failed. Please check your connection.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
   };
 
   const handleRestore = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setLoading(true);
-    setTimeout(async () => {
-      await unlockPro();
-      setLoading(false);
-      toast.show('Purchases successfully restored!', 'success');
-      onClose();
-    }, 1000);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setState('restoring');
+    setErrorMessage(null);
+
+    try {
+      await new Promise((res) => setTimeout(res, 1200));
+      await unlockPro('annual');
+      setState('success');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show('Purchases successfully restored.', 'success');
+      setTimeout(() => {
+        setState('idle');
+        handleClose();
+      }, 900);
+    } catch (e: any) {
+      setState('error');
+      setErrorMessage(e.message || 'No prior purchases found to restore.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
   };
 
   const isDark = mode === 'dark';
+  const featureContext = currentFeature ? FEATURE_DESCRIPTIONS[currentFeature] : null;
 
   return (
-    <Modal transparent animationType="slide" visible={visible}>
-      <BlurView intensity={95} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill}>
+    <Modal transparent animationType="slide" visible={isVisible}>
+      <BlurView intensity={90} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill}>
         <View style={styles.container}>
           {/* Top Close Button */}
           <TouchableOpacity
             style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}
-            onPress={onClose}
+            onPress={handleClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close paywall"
           >
             <X size={20} color={colors.text} />
           </TouchableOpacity>
 
           <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-            {/* Header Crown Icon */}
+            {/* Crown Header Icon */}
             <View style={[styles.iconWrap, { borderColor: palette.amber + '60' }]}>
-              <Crown size={42} color={palette.amberDeep} strokeWidth={2.2} />
+              <Crown size={38} color={palette.amberDeep} strokeWidth={2.2} />
             </View>
 
             <View style={styles.tagWrap}>
-              <Sparkles size={13} color={palette.amberDeep} />
-              <Text style={styles.tagText}>CLINICAL AI & NUTRITION ENGINE</Text>
+              <Sparkles size={12} color={palette.amberDeep} />
+              <Text style={styles.tagText}>INTELLIGENT KITCHEN COMPANION</Text>
             </View>
 
             <Text style={[styles.heroTitle, { color: colors.text }]}>
               Nourish<Text style={{ color: palette.amberDeep }}>+</Text> Pro
             </Text>
             <Text style={[styles.heroSub, { color: colors.subText }]}>
-              Stop throwing away groceries. Maximize nutrition, auto-swap ingredients, and save $200+/month.
+              Elevate your kitchen with clinical nutrition intelligence, smart ingredient substitutions, and automated waste prevention.
             </Text>
 
-            {/* ── Plan Selector Cards ── */}
+            {/* Targeted Feature Spotlight if opened from a specific gate */}
+            {featureContext && (
+              <SurfaceCard style={styles.spotlightCard} variant="paper">
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <Lock size={14} color={palette.amberDeep} />
+                  <Text style={[type.monoBold, { color: palette.amberDeep, fontSize: 11 }]}>
+                    UNLOCKING THIS FEATURE
+                  </Text>
+                </View>
+                <Text style={[type.h3, { color: colors.text, fontFamily: font.sansBold }]}>
+                  {featureContext.name}
+                </Text>
+                <Text style={[type.bodySm, { color: colors.subText, marginTop: 2 }]}>
+                  {featureContext.desc}
+                </Text>
+                <View style={[styles.previewPill, { backgroundColor: colors.surface }]}>
+                  <Check size={12} color={palette.sageDeep} strokeWidth={2.5} />
+                  <Text style={[type.mono, { color: colors.text, fontSize: 10, flex: 1 }]}>
+                    {featureContext.preview}
+                  </Text>
+                </View>
+              </SurfaceCard>
+            )}
+
+            {/* Plan Selector */}
             <View style={styles.planSelectorRow}>
               {/* Annual Plan */}
               <TouchableOpacity
@@ -91,16 +204,21 @@ export function PaywallModal({ visible, onClose }: { visible: boolean; onClose: 
                     backgroundColor: selectedPlan === 'annual' ? (isDark ? '#232D1E' : '#F2FAF4') : colors.surface,
                     borderColor: selectedPlan === 'annual' ? palette.amber : colors.border,
                     borderWidth: selectedPlan === 'annual' ? 2 : 1.5,
-                  }
+                  },
                 ]}
                 onPress={() => { Haptics.selectionAsync(); setSelectedPlan('annual'); }}
+                accessibilityRole="radio"
+                accessibilityLabel="Annual plan: $3.33 per month, billed $39.99 per year"
+                accessibilityState={{ selected: selectedPlan === 'annual' }}
               >
                 <View style={styles.bestValueBadge}>
-                  <Text style={styles.bestValueBadgeText}>SAVE 50% • MOST POPULAR</Text>
+                  <Text style={styles.bestValueBadgeText}>SAVE 50% • RECOMMENDED</Text>
                 </View>
-                <Text style={[styles.planPeriod, { color: colors.text }]}>Annual Access</Text>
-                <Text style={[styles.planPrice, { color: palette.amberDeep }]}>$3.33 <Text style={styles.planPerMo}>/ mo</Text></Text>
-                <Text style={[styles.planBilled, { color: colors.subText }]}>Billed $39.99/year</Text>
+                <Text style={[styles.planPeriod, { color: colors.text }]}>Annual</Text>
+                <Text style={[styles.planPrice, { color: palette.amberDeep }]}>
+                  $3.33 <Text style={styles.planPerMo}>/ mo</Text>
+                </Text>
+                <Text style={[styles.planBilled, { color: colors.subText }]}>Billed $39.99/yr</Text>
               </TouchableOpacity>
 
               {/* Monthly Plan */}
@@ -112,21 +230,26 @@ export function PaywallModal({ visible, onClose }: { visible: boolean; onClose: 
                     backgroundColor: selectedPlan === 'monthly' ? (isDark ? '#232D1E' : '#F2FAF4') : colors.surface,
                     borderColor: selectedPlan === 'monthly' ? palette.amber : colors.border,
                     borderWidth: selectedPlan === 'monthly' ? 2 : 1.5,
-                  }
+                  },
                 ]}
                 onPress={() => { Haptics.selectionAsync(); setSelectedPlan('monthly'); }}
+                accessibilityRole="radio"
+                accessibilityLabel="Monthly plan: $6.99 per month, cancel anytime"
+                accessibilityState={{ selected: selectedPlan === 'monthly' }}
               >
-                <Text style={[styles.planPeriod, { color: colors.text, marginTop: 16 }]}>Monthly Access</Text>
-                <Text style={[styles.planPrice, { color: colors.text }]}>$6.99 <Text style={styles.planPerMo}>/ mo</Text></Text>
-                <Text style={[styles.planBilled, { color: colors.subText }]}>Billed monthly, cancel anytime</Text>
+                <Text style={[styles.planPeriod, { color: colors.text, marginTop: 14 }]}>Monthly</Text>
+                <Text style={[styles.planPrice, { color: colors.text }]}>
+                  $6.99 <Text style={styles.planPerMo}>/ mo</Text>
+                </Text>
+                <Text style={[styles.planBilled, { color: colors.subText }]}>Billed monthly</Text>
               </TouchableOpacity>
             </View>
 
-            {/* ── Free Trial Toggle ── */}
+            {/* Trial Toggle */}
             <View style={[styles.trialRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.trialTitle, { color: colors.text }]}>Enable 7-Day Free Trial</Text>
-                <Text style={[styles.trialSub, { color: colors.subText }]}>You won&apos;t be billed anything today.</Text>
+                <Text style={[styles.trialTitle, { color: colors.text }]}>7-Day Free Trial Included</Text>
+                <Text style={[styles.trialSub, { color: colors.subText }]}>No charge today. Cancel anytime before day 7.</Text>
               </View>
               <Switch
                 value={enableTrial}
@@ -136,95 +259,74 @@ export function PaywallModal({ visible, onClose }: { visible: boolean; onClose: 
               />
             </View>
 
-            {/* ── Feature Comparison Matrix ── */}
-            <GlassPanel style={styles.featureCard}>
-              <Text style={[styles.featureHeader, { color: colors.text }]}>What&apos;s Included in Pro</Text>
-              
-              <FeatureItem
-                title="Unlimited Multi-Item AI Scanner"
-                desc="Instantly identify items, read barcodes, and assess freshness scores."
-                free="3 preview scans"
-                pro="Unlimited scans"
-              />
-              <FeatureItem
-                title="NSGA-II Pareto Rescue Meals"
-                desc="Generate multi-objective meals balancing waste reduction and nutrition."
-                free="2 recipes/day"
-                pro="Unlimited recipes"
-              />
-              <FeatureItem
-                title="Clinical Condition Recipe Swaps"
-                desc="Auto-replace unsafe foods for Hypertension, Diabetes, Celiac, and Renal."
-                free="Basic alerts"
-                pro="Full auto-swap"
-              />
-              <FeatureItem
-                title="Smart Grocery Auto-Restock"
-                desc="Sync depleted pantry items straight to your interactive shopping list."
-                free="Manual list"
-                pro="1-Tap auto sync"
-              />
-              <FeatureItem
-                title="Advanced Micronutrient Analysis"
-                desc="Track Vit C, Calcium, Iron, and strict sodium caps alongside macros."
-                free="Macros only"
-                pro="Complete analysis"
-              />
-            </GlassPanel>
+            {/* Features Included List */}
+            <SurfaceCard style={{ marginVertical: spacing[3], padding: spacing[4] }} variant="subtle">
+              <Text style={[type.label, { color: colors.subText, marginBottom: spacing[3] }]}>
+                ALL PRO CAPABILITIES INCLUDED
+              </Text>
+              {[
+                'Unlimited AI Food & Barcode Scans',
+                'Multi-item Smart Receipt Digitizer',
+                'Personalized Macro & Micronutrient Engine',
+                'Pantry-aware Ingredient Substitutions',
+                'Predictive Freshness & Expiry Curves',
+                'Detailed Carbon & Financial Impact Reports',
+              ].map((feat, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 }}>
+                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: palette.sageMist, alignItems: 'center', justifyContent: 'center' }}>
+                    <Check size={11} color={palette.sageDeep} strokeWidth={2.5} />
+                  </View>
+                  <Text style={[type.bodySm, { color: colors.text, flex: 1 }]}>{feat}</Text>
+                </View>
+              ))}
+            </SurfaceCard>
 
-            {/* ── Social Proof Testimonial ── */}
-            <View style={[styles.testimonialCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : '#FFFBEB', borderColor: palette.amber + '40' }]}>
-              <View style={{ flexDirection: 'row', gap: 4, marginBottom: 6 }}>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} size={14} color={palette.amberDeep} fill={palette.amberDeep} />
-                ))}
+            {/* Error Message if any */}
+            {errorMessage && (
+              <View style={[styles.errorBox, { backgroundColor: palette.crimsonMist }]}>
+                <AlertCircle size={16} color={palette.crimson} />
+                <Text style={[type.bodySm, { color: palette.crimson, flex: 1 }]}>{errorMessage}</Text>
               </View>
-              <Text style={[styles.testimonialQuote, { color: colors.text }]}>
-                &ldquo;Nourish+ saved our household $280 on wasted groceries in our first month alone. The AI scanner is crazy fast.&rdquo;
-              </Text>
-              <Text style={[styles.testimonialAuthor, { color: colors.subText }]}>
-                — Dr. Priya M., Nutritionist & Verified Subscriber
-              </Text>
-            </View>
+            )}
 
-            {/* ── Primary CTA Upgrade Button ── */}
-            <BrutalButton
-              variant="sage"
-              style={[styles.upgradeBtn, { backgroundColor: palette.amberDeep }]}
-              onPress={handleUpgrade}
-              disabled={loading}
-            >
-              <Sparkles size={18} color={palette.chalk} />
-              <Text style={[type.label, { color: palette.chalk, marginLeft: 8 }]}>
-                {loading
-                  ? 'ACTIVATING NOURISH+...'
-                  : enableTrial
-                  ? 'START 7-DAY FREE TRIAL'
-                  : 'UNLOCK NOURISH+ PRO'}
-              </Text>
-            </BrutalButton>
+            {/* CTAs */}
+            <View style={{ marginTop: spacing[4], gap: 10 }}>
+              <PrimaryAction
+                label={
+                  state === 'purchasing' ? 'Securing Access...' :
+                  enableTrial ? 'Start 7-Day Free Trial' :
+                  `Subscribe for ${selectedPlan === 'annual' ? '$39.99/yr' : '$6.99/mo'}`
+                }
+                onPress={handleUpgrade}
+                loading={state === 'purchasing'}
+                variant="sage"
+                icon={Sparkles}
+              />
 
-            {/* Secondary actions */}
-            <View style={styles.footerRow}>
-              <TouchableOpacity onPress={handleRestore}>
-                <Text style={[styles.footerLink, { color: colors.subText }]}>Restore Purchases</Text>
-              </TouchableOpacity>
-              <Text style={{ color: colors.subText }}>•</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Text style={[styles.footerLink, { color: colors.subText }]}>Terms of Service</Text>
-              </TouchableOpacity>
-              <Text style={{ color: colors.subText }}>•</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Text style={[styles.footerLink, { color: colors.subText }]}>Privacy Policy</Text>
+              <TouchableOpacity
+                onPress={handleRestore}
+                disabled={state === 'restoring' || state === 'purchasing'}
+                style={{ paddingVertical: 10, alignItems: 'center' }}
+                accessibilityRole="button"
+                accessibilityLabel="Restore previous purchases"
+              >
+                {state === 'restoring' ? (
+                  <ActivityIndicator size="small" color={colors.subText} />
+                ) : (
+                  <Text style={[type.monoBold, { color: colors.subText, fontSize: 11 }]}>
+                    RESTORE PURCHASES
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
 
-            <View style={styles.guaranteeRow}>
-              <ShieldCheck size={14} color={palette.sageDeep} />
-              <Text style={[styles.guaranteeText, { color: colors.subText }]}>
-                Guaranteed safe checkout. Cancel anytime via App Store or Google Play.
-              </Text>
-            </View>
+            {/* Legal & Renewal Terms */}
+            <Text style={[styles.termsText, { color: colors.subText }]}>
+              {enableTrial
+                ? 'After 7 days, your subscription will renew automatically at the selected price unless cancelled at least 24 hours before the trial ends. '
+                : 'Your subscription renews automatically unless cancelled at least 24 hours before the end of the current period. '}
+              Payment will be charged to your App Store or Google Play account. Manage or cancel anytime in account settings.
+            </Text>
           </ScrollView>
         </View>
       </BlurView>
@@ -232,133 +334,129 @@ export function PaywallModal({ visible, onClose }: { visible: boolean; onClose: 
   );
 }
 
-function FeatureItem({ title, desc, free, pro }: { title: string; desc: string; free: string; pro: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.featureItemRow}>
-      <View style={[styles.featureIconWrap, { backgroundColor: palette.amber + '20' }]}>
-        <Check size={14} color={palette.amberDeep} strokeWidth={3} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.featureItemTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.featureItemDesc, { color: colors.subText }]}>{desc}</Text>
-        <View style={styles.tierPillRow}>
-          <Text style={[styles.freeTag, { color: colors.subText }]}>Free: {free}</Text>
-          <Text style={[styles.proTag, { color: palette.sageDeep }]}>Pro: {pro}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 50,
+    paddingTop: 48,
   },
   closeBtn: {
     position: 'absolute',
-    top: 50,
+    top: 48,
     right: 20,
-    zIndex: 10,
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   scroll: {
-    padding: spacing[4],
-    paddingBottom: 80,
+    paddingHorizontal: 22,
+    paddingBottom: 48,
     alignItems: 'center',
   },
   iconWrap: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    marginTop: 10,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 14,
   },
   tagWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginBottom: 8,
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   tagText: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: font.sansBold,
     color: palette.amberDeep,
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   heroTitle: {
-    fontSize: 32,
-    fontFamily: font.sansBold,
-    letterSpacing: -0.5,
+    fontFamily: font.display,
+    fontSize: 30,
+    letterSpacing: -0.8,
     textAlign: 'center',
+    marginBottom: 8,
   },
   heroSub: {
-    fontSize: 13,
     fontFamily: font.sans,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center',
-    marginTop: 6,
     marginBottom: 20,
-    paddingHorizontal: 16,
-    lineHeight: 18,
+    maxWidth: 320,
+  },
+  spotlightCard: {
+    width: '100%',
+    padding: spacing[4],
+    borderRadius: 16,
+    marginBottom: spacing[4],
+  },
+  previewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 8,
   },
   planSelectorRow: {
     flexDirection: 'row',
     gap: 12,
     width: '100%',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   planCard: {
     flex: 1,
+    borderRadius: 16,
     padding: 14,
-    borderRadius: 18,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    minHeight: 110,
     position: 'relative',
   },
   bestValueBadge: {
     position: 'absolute',
     top: -10,
-    left: 10,
     backgroundColor: palette.amberDeep,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   bestValueBadgeText: {
+    color: palette.chalk,
     fontSize: 8,
     fontFamily: font.sansBold,
-    color: palette.chalk,
     letterSpacing: 0.5,
   },
   planPeriod: {
-    fontSize: 14,
     fontFamily: font.sansBold,
-    marginTop: 6,
+    fontSize: 13,
+    marginBottom: 4,
   },
   planPrice: {
+    fontFamily: font.display,
     fontSize: 22,
-    fontFamily: font.sansBold,
-    marginTop: 4,
+    letterSpacing: -0.5,
   },
   planPerMo: {
-    fontSize: 12,
     fontFamily: font.sans,
+    fontSize: 11,
   },
   planBilled: {
-    fontSize: 10,
     fontFamily: font.sans,
+    fontSize: 10,
     marginTop: 4,
   },
   trialRow: {
@@ -366,112 +464,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    padding: 14,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    marginBottom: 16,
+    padding: 14,
+    marginBottom: 12,
   },
   trialTitle: {
-    fontSize: 14,
     fontFamily: font.sansBold,
+    fontSize: 13,
   },
   trialSub: {
-    fontSize: 11,
     fontFamily: font.sans,
+    fontSize: 11,
     marginTop: 2,
   },
-  featureCard: {
-    width: '100%',
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-  featureHeader: {
-    fontSize: 16,
-    fontFamily: font.sansBold,
-    marginBottom: 14,
-  },
-  featureItemRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 14,
-  },
-  featureIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  featureItemTitle: {
-    fontSize: 14,
-    fontFamily: font.sansBold,
-  },
-  featureItemDesc: {
-    fontSize: 11,
-    fontFamily: font.sans,
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  tierPillRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  freeTag: {
-    fontSize: 10,
-    fontFamily: font.sans,
-  },
-  proTag: {
-    fontSize: 10,
-    fontFamily: font.sansBold,
-  },
-  testimonialCard: {
-    width: '100%',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.2,
-    marginBottom: 18,
-  },
-  testimonialQuote: {
-    fontSize: 12,
-    fontFamily: font.sans,
-    fontStyle: 'italic',
-    lineHeight: 17,
-  },
-  testimonialAuthor: {
-    fontSize: 11,
-    fontFamily: font.sansBold,
-    marginTop: 6,
-  },
-  upgradeBtn: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 18,
-  },
-  footerRow: {
+  errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 16,
+    padding: 12,
+    borderRadius: 10,
+    marginVertical: 8,
+    width: '100%',
   },
-  footerLink: {
-    fontSize: 11,
+  termsText: {
     fontFamily: font.sans,
-    textDecorationLine: 'underline',
-  },
-  guaranteeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 16,
-  },
-  guaranteeText: {
     fontSize: 10,
-    fontFamily: font.sans,
+    lineHeight: 15,
     textAlign: 'center',
+    marginTop: 18,
+    maxWidth: 320,
+    opacity: 0.7,
   },
 });

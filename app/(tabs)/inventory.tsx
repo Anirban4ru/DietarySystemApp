@@ -1,504 +1,783 @@
-import { ShoppingView } from './shopping';
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
-  ScrollView, Animated, PanResponder, ActivityIndicator,
+  ScrollView, Animated, ActivityIndicator, Alert,
 } from 'react-native';
-import { Plus, AlertTriangle, X, BookOpen, Check, Trash2, Filter, SortAsc, Zap, ChefHat, Info , ShoppingBag } from 'lucide-react-native';
+import {
+  Plus, AlertTriangle, X, Check, Trash2, Filter,
+  ChefHat, Info, ShoppingBag, Snowflake, HeartHandshake,
+  Search, Undo2, ArrowRight, Boxes, CheckCircle2,
+  Sparkles, ChevronRight, BookOpen,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { palette, type, spacing, font, border } from '@/lib/theme';
-import { Label, Pill, Bar, GlassPanel, BrutalButton, PressScale, SkeletonCard, useTheme, useToast, Loader, EmptyState } from '@/components/ui';
+import { palette, type, spacing, font } from '@/lib/theme';
+import {
+  useTheme, SurfaceCard, MetricCard, StatusBadge,
+  FreshnessBadge, PrimaryAction, SecondaryAction, IconButton,
+  ConfirmDialog, useToast, SkeletonCard, EmptyState,
+} from '@/components/ui';
+import { PressableScale, FadeInStagger } from '@/components/motion';
 import { useInventory, useImpact, useDisposals, useXp } from '@/lib/hooks';
-import { getTipInsight , parseNaturalLanguagePantry } from '@/lib/ai';
+import { getTipInsight, parseNaturalLanguagePantry } from '@/lib/ai';
 import { InventoryRow, FoodCategory } from '@/lib/types';
-import { FOOD_CATALOG, CATEGORY_LABELS, FOOD_BY_NAME, nutrientFraction } from '@/lib/foodCatalog';
+import { FOOD_CATALOG, CATEGORY_LABELS, FOOD_BY_NAME } from '@/lib/foodCatalog';
 import { getStorageTip, xpForConsumed } from '@/lib/features';
+import { ShoppingView } from './shopping';
 
-type SortKey = 'expiry' | 'name' | 'category';
-type FilterKey = 'all' | 'critical' | 'soon' | 'stable';
-
-function daysLeft(row: InventoryRow): number {
-  if (!row.expires_at) return 999;
-  return Math.ceil((new Date(row.expires_at).getTime() - Date.now()) / 86400000);
+function daysLeft(expires_at: string | null): number {
+  if (!expires_at) return 999;
+  return Math.ceil((new Date(expires_at).getTime() - Date.now()) / 86400000);
 }
 
-function urgency(row: InventoryRow): 'critical' | 'soon' | 'stable' {
-  const d = daysLeft(row);
-  if (d <= 1) return 'critical';
-  if (d <= 3) return 'soon';
+function getUrgencyGroup(row: InventoryRow): 'today' | 'week' | 'stable' {
+  const d = daysLeft(row.expires_at);
+  if (d <= 1) return 'today';
+  if (d <= 7) return 'week';
   return 'stable';
 }
 
-function relativeExpiry(row: InventoryRow): string {
-  const d = daysLeft(row);
-  if (d <= 0) return 'Expired';
-  if (d === 1) return 'Tomorrow';
-  if (d <= 7) return `${d} days left`;
-  return `${d}d`;
-}
-
-function freshnessColor(urg: 'critical' | 'soon' | 'stable'): string {
-  if (urg === 'critical') return palette.danger;
-  if (urg === 'soon') return palette.warning;
-  return palette.success;
-}
-
 export default function InventoryScreen() {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const toast = useToast();
+
   const { items, loading, add, remove } = useInventory();
   const { logEvent } = useImpact();
   const { logDisposal } = useDisposals();
   const { addXp } = useXp();
-  const toast = useToast();
-  const [modal, setModal] = useState(false);
-  const [tipModal, setTipModal] = useState<InventoryRow | null>(null);
-  const [sort, setSort] = useState<SortKey>('expiry');
-  const [filter, setFilter] = useState<FilterKey>('all');
-  const [showControls, setShowControls] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pantry' | 'grocery'>('pantry');
 
-  const sorted = useMemo(() => {
-    let list = [...items];
-    if (filter !== 'all') list = list.filter((i) => urgency(i) === filter);
-    if (sort === 'expiry') list.sort((a, b) => daysLeft(a) - daysLeft(b));
-    else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
-    else list.sort((a, b) => a.category.localeCompare(b.category));
-    return list;
-  }, [items, sort, filter]);
+  const [activeSegment, setActiveSegment] = useState<'pantry' | 'grocery'>('pantry');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [tipItem, setTipItem] = useState<InventoryRow | null>(null);
+  const [tipInsight, setTipInsight] = useState<string | null>(null);
+  const [loadingTip, setLoadingTip] = useState(false);
 
-  const critical = items.filter((i) => urgency(i) === 'critical');
-  const soon = items.filter((i) => urgency(i) === 'soon');
-  const urgentCount = critical.length + soon.length;
+  // Manual Add Modal
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState<FoodCategory>('leafy_green');
+  const [newItemQty, setNewItemQty] = useState('1');
+  const [newItemDays, setNewItemDays] = useState('7');
 
-  const discard = async (row: InventoryRow) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    const food = FOOD_BY_NAME[row.name.toLowerCase()];
-    const co2 = (food?.co2ePerKg ?? 1) * 0.15;
-    await logDisposal(row.name, row.category, 'expired');
-    await logEvent('item_discarded', co2, { name: row.name });
-    await remove(row.id);
-    toast.show(`${row.name} tossed 🗑️`, 'error');
-  };
+  // Undo cache
+  const lastActionItem = useRef<{ item: InventoryRow; action: string } | null>(null);
 
-  const consume = async (row: InventoryRow) => {
+  // Filtered Items
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+      const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [items, searchQuery, selectedCategory]);
+
+  // Grouped by Urgency
+  const todayItems = useMemo(() => filteredItems.filter((i) => getUrgencyGroup(i) === 'today'), [filteredItems]);
+  const weekItems = useMemo(() => filteredItems.filter((i) => getUrgencyGroup(i) === 'week'), [filteredItems]);
+  const stableItems = useMemo(() => filteredItems.filter((i) => getUrgencyGroup(i) === 'stable'), [filteredItems]);
+
+  const urgentTotal = items.filter((i) => daysLeft(i.expires_at) <= 3).length;
+
+  // Actions
+  const handleConsume = async (item: InventoryRow) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const food = FOOD_BY_NAME[row.name.toLowerCase()];
+    lastActionItem.current = { item, action: 'consumed' };
+    const food = FOOD_BY_NAME[item.name.toLowerCase()];
     const co2 = (food?.co2ePerKg ?? 1) * 0.15;
-    await logEvent('item_consumed', co2, { name: row.name });
+    await logEvent('item_consumed', co2, { name: item.name });
     await addXp(xpForConsumed(co2));
-    await remove(row.id);
-    toast.show(`${row.name} marked as eaten ✓`, 'success');
+    await remove(item.id);
+    toast.show(`Eaten: ${item.name} (+${xpForConsumed(co2)} XP)`, 'success');
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.bg }] as any}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 120, paddingTop: insets.top + 8 } as any}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.screenTitle, { color: colors.text }]}>Pantry</Text>
-            <Text style={[styles.screenSub, { color: colors.subText }]}>
-              {items.length} items · {urgentCount > 0 ? `${urgentCount} need attention` : 'all fresh'}
-            </Text>
-          </View>
-          <PressScale onPress={() => { Haptics.selectionAsync(); setShowControls((x) => !x); }}>
-            <View style={[styles.filterBtn, { borderColor: colors.border, backgroundColor: showControls ? palette.ink : colors.surface }] as any}>
-              <Filter size={16} color={showControls ? palette.chalk : colors.subText} strokeWidth={2.5} />
-            </View>
-          </PressScale>
-        </View>
-
-        {/* Alert banner */}
-        {(critical.length > 0 || soon.length > 0) && (
-          <View style={[styles.alertBanner, { backgroundColor: '#FFF4F4', borderColor: palette.danger }] as any}>
-            <AlertTriangle size={15} color={palette.danger} strokeWidth={2.5} />
-            <Text style={[type.bodySm, { color: palette.danger, marginLeft: 8, flex: 1, fontFamily: font.sansBold }]}>
-              {critical.length > 0 ? `${critical.length} expiring today` : ''}{critical.length > 0 && soon.length > 0 ? ' · ' : ''}{soon.length > 0 ? `${soon.length} expiring in 3 days` : ''}
-            </Text>
-          </View>
-        )}
-
-        {/* Sort / Filter controls */}
-        {showControls && (
-          <View style={[styles.controlsBox, { borderColor: colors.border, backgroundColor: colors.surface }] as any}>
-            <Text style={[styles.controlLabel, { color: colors.subText }]}>FILTER</Text>
-            <View style={styles.chipRow}>
-              {(['all', 'critical', 'soon', 'stable'] as FilterKey[]).map((f) => (
-                <PressScale key={f} onPress={() => setFilter(f)}>
-                  <View style={[styles.controlChip, { backgroundColor: filter === f ? palette.ink : colors.bg, borderColor: filter === f ? palette.ink : colors.border }] as any}>
-                    <Text style={[styles.controlChipText, { color: filter === f ? palette.chalk : colors.text }]}>{f}</Text>
-                  </View>
-                </PressScale>
-              ))}
-            </View>
-            <Text style={[styles.controlLabel, { color: colors.subText, marginTop: 10 }]}>SORT</Text>
-            <View style={styles.chipRow}>
-              {(['expiry', 'name', 'category'] as SortKey[]).map((s) => (
-                <PressScale key={s} onPress={() => setSort(s)}>
-                  <View style={[styles.controlChip, { backgroundColor: sort === s ? palette.sageDeep : colors.bg, borderColor: sort === s ? palette.sageDeep : colors.border }] as any}>
-                    <Text style={[styles.controlChipText, { color: sort === s ? palette.chalk : colors.text }]}>{s}</Text>
-                  </View>
-                </PressScale>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Loading skeletons */}
-        {loading && (
-          <View style={{ marginTop: 8 }}>
-            <SkeletonCard height={90} />
-            <SkeletonCard height={90} />
-            <SkeletonCard height={90} />
-          </View>
-        )}
-
-        {/* Empty state */}
-        {!loading && sorted.length === 0 && (
-          <EmptyState 
-            icon={ShoppingBag} 
-            title="Pantry is empty" 
-            message="Scan food with the camera or tap + to add manually."
-            actionLabel="ADD FIRST ITEM"
-            onAction={() => setModal(true)}
-          />
-        )}
-
-        {/* Items */}
-        {sorted.map((row, idx) => (
-          <ItemCard
-            key={row.id}
-            row={row}
-            index={idx}
-            colors={colors}
-            onConsume={() => consume(row)}
-            onDiscard={() => discard(row)}
-            onTip={() => { Haptics.selectionAsync(); setTipModal(row); }}
-          />
-        ))}
-      </ScrollView>
-
-      {/* FAB */}
-      <PressScale
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setModal(true); }}
-        style={[styles.fab, { bottom: insets.bottom + spacing[6] }]}
-      >
-        <View style={[styles.fabInner, { backgroundColor: palette.ink }]}>
-          <Plus size={26} color={palette.chalk} strokeWidth={2.5} />
-        </View>
-      </PressScale>
-
-      <AddModal visible={modal} onClose={() => setModal(false)} onAdd={add} />
-      <TipModal row={tipModal} onClose={() => setTipModal(null)} />
-    </View>
-  );
-}
-
-// ─── Item Card ───────────────────────────────────────────────────
-function ItemCard({ row, index, colors, onConsume, onDiscard, onTip }: {
-  row: InventoryRow; index: number; colors: any;
-  onConsume: () => void; onDiscard: () => void; onTip: () => void;
-}) {
-  const food = FOOD_BY_NAME[row.name.toLowerCase()];
-  const d = daysLeft(row);
-  const urg = urgency(row);
-  const toneColor = freshnessColor(urg);
-  const tonePill: any = urg === 'critical' ? 'danger' : urg === 'soon' ? 'warning' : 'success';
-  const frac = food ? nutrientFraction(food.fragility, Math.max(0, food.shelfLifeDays - d), food.shelfLifeDays) : 1;
-
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  useRef(() => {
-    slideAnim.setValue(30);
-    Animated.timing(slideAnim, {
-      toValue: 0, duration: 300, delay: index * 50, useNativeDriver: true,
-    }).start();
-  });
-
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  useMemo(() => {
-    Animated.timing(fadeIn, {
-      toValue: 1, duration: 350, delay: index * 60, useNativeDriver: true,
-    }).start();
-  }, []);
-
-  return (
-    <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideAnim }] }}>
-      <View style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {/* Freshness stripe */}
-        <View style={[styles.freshnessStripe, { backgroundColor: toneColor }]} />
-
-        <View style={styles.itemContent}>
-          <View style={styles.itemTop}>
-            <Text style={[styles.itemName, { color: colors.text }]}>{row.name}</Text>
-            <Pill tone={tonePill}>{relativeExpiry(row)}</Pill>
-          </View>
-
-          <Text style={[type.bodySm, { color: colors.subText, marginTop: 4 }]}>
-            {row.quantity} {row.unit} · {CATEGORY_LABELS[row.category as FoodCategory]}
-          </Text>
-
-          {food && frac < 0.95 && (
-            <View style={styles.nutriRow}>
-              <Text style={[type.bodySm, { color: colors.subText, width: 60 }]}>Nutrients</Text>
-              <View style={{ flex: 1, marginHorizontal: 8 }}>
-                <Bar value={frac} color={toneColor} track={colors.border} />
-              </View>
-              <Text style={[type.monoBold, { color: toneColor, fontSize: 11 }]}>{Math.round(frac * 100)}%</Text>
-            </View>
-          )}
-
-          <View style={styles.actionRow}>
-            <PressScale onPress={onConsume} style={[styles.actionBtn, { borderColor: palette.sageDeep, backgroundColor: '#F0F7F4' }]}>
-              <Check size={13} color={palette.sageDeep} strokeWidth={2.8} />
-              <Text style={[type.monoBold, { color: palette.sageDeep, fontSize: 10, marginLeft: 5 }]}>ATE IT</Text>
-            </PressScale>
-            <PressScale onPress={onDiscard} style={[styles.actionBtn, { borderColor: palette.danger, backgroundColor: '#FFF4F4' }]}>
-              <Trash2 size={13} color={palette.danger} strokeWidth={2.5} />
-              <Text style={[type.monoBold, { color: palette.danger, fontSize: 10, marginLeft: 5 }]}>TOSSED</Text>
-            </PressScale>
-            <PressScale onPress={onTip} style={[styles.actionBtn, { borderColor: colors.border, backgroundColor: colors.bg }]}>
-              <BookOpen size={13} color={colors.subText} strokeWidth={2.5} />
-              <Text style={[type.monoBold, { color: colors.subText, fontSize: 10, marginLeft: 5 }]}>TIPS</Text>
-            </PressScale>
-          </View>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ─── Add Modal ───────────────────────────────────────────────────
-function AddModal({ visible, onClose, onAdd }: { visible: boolean; onClose: () => void; onAdd: any }) {
-  const { colors } = useTheme();
-  const toast = useToast();
-  const [query, setQuery] = useState('');
-  const [nlpLoading, setNlpLoading] = useState(false);
-  
-  const filtered = FOOD_CATALOG.filter((f) => f.name.toLowerCase().includes(query.toLowerCase())).slice(0, 12);
-
-  const pick = async (name: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await onAdd({ name });
-    setQuery('');
-    onClose();
+  const handleFreeze = async (item: InventoryRow) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const newExpiry = new Date(Date.now() + 90 * 86400000).toISOString();
+    await remove(item.id);
+    await add({
+      name: `${item.name} (Frozen)`,
+      category: item.category,
+      quantity: item.quantity,
+      unit: item.unit,
+      shelfLifeDays: 90,
+    });
+    await addXp(15);
+    toast.show(`Frozen: ${item.name} (+90 days preservation)`, 'success');
   };
 
-  const handleSmartParse = async () => {
-    if (!query.trim()) return;
-    setNlpLoading(true);
+  const handleDonate = async (item: InventoryRow) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    lastActionItem.current = { item, action: 'donated' };
+    const food = FOOD_BY_NAME[item.name.toLowerCase()];
+    const co2 = (food?.co2ePerKg ?? 1) * 0.25;
+    await logEvent('item_consumed', co2, { type: 'donation', name: item.name });
+    await addXp(25);
+    await remove(item.id);
+    toast.show(`Donated: ${item.name} (+25 XP)`, 'success');
+  };
+
+  const handleDiscard = async (item: InventoryRow) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    lastActionItem.current = { item, action: 'discarded' };
+    const food = FOOD_BY_NAME[item.name.toLowerCase()];
+    const co2 = (food?.co2ePerKg ?? 1) * 0.15;
+    await logDisposal(item.name, item.category, 'expired');
+    await logEvent('item_discarded', co2, { name: item.name });
+    await remove(item.id);
+    toast.show(`Discarded: ${item.name}`, 'error');
+  };
+
+  const handleUndo = async () => {
+    if (!lastActionItem.current) return;
+    const { item } = lastActionItem.current;
+    const days = Math.max(1, daysLeft(item.expires_at));
+    await add({
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      unit: item.unit,
+      shelfLifeDays: days,
+    });
+    lastActionItem.current = null;
+    toast.show(`Restored ${item.name} to pantry`, 'success');
+  };
+
+  const openStorageTip = async (item: InventoryRow) => {
+    setTipItem(item);
+    setLoadingTip(true);
+    setTipInsight(null);
     try {
-      const items = await parseNaturalLanguagePantry(query);
-      if (items.length > 0) {
-        for (const item of items) {
-          await onAdd({ name: item.name, quantity: item.quantity, unit: item.unit });
-        }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        toast.show(`Added ${items.length} items from text`, 'success');
-        setQuery('');
-        onClose();
-      } else {
-        toast.show('Could not identify any food items.', 'info');
-      }
-    } catch (e) {
-      toast.show('Failed to parse text', 'error');
+      const days = Math.max(0, daysLeft(item.expires_at));
+      const insight = await getTipInsight(item.name, days);
+      setTipInsight(`${insight.freshness}\n\nStorage Tip: ${getStorageTip(item.name)}`);
+    } catch {
+      setTipInsight(getStorageTip(item.name));
+    } finally {
+      setLoadingTip(false);
     }
-    setNlpLoading(false);
   };
 
+  const handleSaveNewItem = async () => {
+    if (!newItemName.trim()) return;
+    const days = parseInt(newItemDays, 10) || 7;
+    await add({
+      name: newItemName.trim(),
+      category: newItemCategory,
+      quantity: parseFloat(newItemQty) || 1,
+      unit: 'pcs',
+      shelfLifeDays: days,
+    });
+    setNewItemName('');
+    setAddModalVisible(false);
+    toast.show(`Added ${newItemName.trim()} to pantry`, 'success');
+  };
+
+  const isDark = mode === 'dark';
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { backgroundColor: colors.bg }]}>
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <Text style={[type.h1, { color: colors.text }]}>Add to Pantry</Text>
-            <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
-              <View style={[styles.closeBtn, { borderColor: colors.border }]}>
-                <X size={18} color={colors.subText} strokeWidth={2.5} />
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      {/* ── TOP SEGMENTED SWITCHER ── */}
+      <View style={[styles.segmentContainer, { paddingTop: insets.top + 8, backgroundColor: colors.surface }]}>
+        <View style={[styles.segmentTrack, { backgroundColor: colors.paperBg, borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.segmentTab, activeSegment === 'pantry' && { backgroundColor: palette.sageDeep }]}
+            onPress={() => { Haptics.selectionAsync(); setActiveSegment('pantry'); }}
+            accessibilityRole="tab"
+            accessibilityLabel="Pantry Inventory tab"
+            accessibilityState={{ selected: activeSegment === 'pantry' }}
+          >
+            <Boxes size={15} color={activeSegment === 'pantry' ? palette.chalk : colors.subText} strokeWidth={2.2} />
+            <Text style={[styles.segmentLabel, { color: activeSegment === 'pantry' ? palette.chalk : colors.subText }]}>
+              Pantry Inventory
+            </Text>
+            {urgentTotal > 0 && (
+              <View style={styles.segmentBadge}>
+                <Text style={styles.segmentBadgeText}>{urgentTotal}</Text>
               </View>
-            </PressScale>
-          </View>
-          <TextInput
-            style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
-            placeholder="Type or dictate (e.g. '3 apples and milk')"
-            placeholderTextColor={colors.subText}
-            value={query}
-            onChangeText={setQuery}
-            autoFocus
-          />
-          
-          {query.trim().length > 3 && (
-            <PressScale onPress={handleSmartParse} disabled={nlpLoading} style={{ marginBottom: spacing[3] }}>
-              <View style={[styles.actionBtn, { backgroundColor: palette.ink, justifyContent: 'center' }]}>
-                {nlpLoading ? <Loader /> : <Zap size={15} color={palette.chalk} strokeWidth={2.5} />}
-                <Text style={[styles.actionBtnText, { color: palette.chalk, marginLeft: 8 }]}>
-                  {nlpLoading ? 'PARSING...' : 'SMART ADD'}
-                </Text>
-              </View>
-            </PressScale>
-          )}
-          <ScrollView style={{ maxHeight: 380 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-            {filtered.map((f) => (
-              <PressScale key={f.name} onPress={() => pick(f.name)}>
-                <View style={[styles.suggestRow, { borderBottomColor: colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[type.body, { color: colors.text, fontFamily: font.sansBold }]}>{f.name}</Text>
-                    <Text style={[type.bodySm, { color: colors.subText }]}>{CATEGORY_LABELS[f.category]} · Lasts {f.shelfLifeDays} days</Text>
-                  </View>
-                  <Plus size={16} color={colors.subText} strokeWidth={2.5} />
-                </View>
-              </PressScale>
-            ))}
-          </ScrollView>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentTab, activeSegment === 'grocery' && { backgroundColor: palette.sageDeep }]}
+            onPress={() => { Haptics.selectionAsync(); setActiveSegment('grocery'); }}
+            accessibilityRole="tab"
+            accessibilityLabel="Smart Grocery List tab"
+            accessibilityState={{ selected: activeSegment === 'grocery' }}
+          >
+            <ShoppingBag size={15} color={activeSegment === 'grocery' ? palette.chalk : colors.subText} strokeWidth={2.2} />
+            <Text style={[styles.segmentLabel, { color: activeSegment === 'grocery' ? palette.chalk : colors.subText }]}>
+              Smart Grocery
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
-    </Modal>
-  );
-}
 
-// ─── Tip Modal ───────────────────────────────────────────────────
-function TipModal({ row, onClose }: { row: InventoryRow | null; onClose: () => void }) {
-  const { colors } = useTheme();
-  const [insight, setInsight] = useState<{ recipes: string[], freshness: string, calories: string } | null>(null);
-  const [loading, setLoading] = useState(false);
+      {/* ── EMBEDDED SMART GROCERY LIST IF SELECTED ── */}
+      {activeSegment === 'grocery' ? (
+        <ShoppingView embedded={true} />
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{
+            paddingBottom: insets.bottom + 100,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+          }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header & Subtitle */}
+          <View style={styles.titleRow}>
+            <View>
+              <Text style={[type.display, { color: colors.text }]}>Pantry</Text>
+              <Text style={[type.bodySm, { color: colors.subText, marginTop: 2 }]}>
+                {items.length} items total • {urgentTotal > 0 ? `${urgentTotal} urgent items` : 'all fresh'}
+              </Text>
+            </View>
 
-  useEffect(() => {
-    if (row) {
-      setLoading(true);
-      setInsight(null);
-      getTipInsight(row.name, Math.max(0, daysLeft(row))).then(res => {
-        setInsight(res);
-        setLoading(false);
-      });
-    }
-  }, [row]);
-
-  if (!row) return null;
-  const tip = getStorageTip(row.name);
-  const food = FOOD_BY_NAME[row.name.toLowerCase()];
-  return (
-    <Modal visible={!!row} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { backgroundColor: colors.bg }]}>
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <Text style={[type.h1, { color: colors.text }]}>{row.name}</Text>
-            <PressScale onPress={() => { Haptics.selectionAsync(); onClose(); }}>
-              <View style={[styles.closeBtn, { borderColor: colors.border }]}>
-                <X size={18} color={colors.subText} strokeWidth={2.5} />
-              </View>
-            </PressScale>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {lastActionItem.current && (
+                <IconButton
+                  icon={Undo2}
+                  onPress={handleUndo}
+                  accessibilityLabel="Undo last pantry action"
+                  color={palette.amberDeep}
+                  bg={colors.surface}
+                />
+              )}
+              <IconButton
+                icon={Plus}
+                onPress={() => setAddModalVisible(true)}
+                accessibilityLabel="Add manual pantry item"
+                color={palette.sageDeep}
+                bg={colors.surface}
+              />
+            </View>
           </View>
 
-          {loading ? (
-            <View style={{ alignItems: 'center', paddingVertical: spacing[6] }}>
-              <Loader />
-              <Text style={[type.bodySm, { color: colors.subText, marginTop: spacing[3] }]}>Generating AI insights...</Text>
+          {/* Search Bar */}
+          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Search size={18} color={colors.subText} strokeWidth={2} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search pantry items..."
+              placeholderTextColor={colors.subText}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
+                <X size={16} color={colors.subText} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Category Filter Chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+            {['all', 'produce', 'dairy', 'meat', 'bakery', 'pantry', 'frozen'].map((cat) => {
+              const isSelected = selectedCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.catChip,
+                    {
+                      backgroundColor: isSelected ? palette.sageDeep : colors.surface,
+                      borderColor: isSelected ? palette.sageDeep : colors.border,
+                    },
+                  ]}
+                  onPress={() => { Haptics.selectionAsync(); setSelectedCategory(cat); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Filter by ${cat}`}
+                >
+                  <Text style={[styles.catChipText, { color: isSelected ? palette.chalk : colors.text }]}>
+                    {cat.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Loading Skeleton */}
+          {loading && (
+            <View style={{ gap: 10, marginTop: 12 }}>
+              <SkeletonCard height={88} />
+              <SkeletonCard height={88} />
+              <SkeletonCard height={88} />
             </View>
-          ) : (
-            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
-              <View style={{ marginTop: spacing[3] }}>
-                <Label>PROPER STORAGE</Label>
-                <Text style={[type.body, { color: colors.text, marginTop: spacing[2], lineHeight: 24 }]}>{insight?.freshness || tip}</Text>
+          )}
+
+          {/* ── SECTION 1: USE TODAY (Urgent) ── */}
+          {todayItems.length > 0 && (
+            <View style={styles.sectionWrap}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionBullet, { backgroundColor: palette.crimson }]} />
+                <Text style={[type.h2, { color: palette.crimson }]}>Use Today / Tomorrow</Text>
+                <View style={[styles.sectionCountBadge, { backgroundColor: palette.crimsonMist }]}>
+                  <Text style={[type.monoBold, { color: palette.crimson, fontSize: 10 }]}>{todayItems.length}</Text>
+                </View>
               </View>
 
-              {insight && insight.recipes.length > 0 && (
-                <View style={{ marginTop: spacing[5] }}>
-                  <Label>TOP RECIPES (TO USE IT UP)</Label>
-                  {insight.recipes.map((r, i) => (
-                    <View key={i} style={[styles.stepRow, { marginTop: spacing[2] }]}>
-                      <View style={[styles.ingDot, { backgroundColor: palette.sageDeep, marginTop: 6 }]} />
-                      <Text style={[type.body, { color: colors.text, flex: 1 }]}>{r}</Text>
-                    </View>
-                  ))}
+              {todayItems.map((item) => (
+                <PantryItemCard
+                  key={item.id}
+                  item={item}
+                  onConsume={() => handleConsume(item)}
+                  onFreeze={() => handleFreeze(item)}
+                  onDonate={() => handleDonate(item)}
+                  onDiscard={() => handleDiscard(item)}
+                  onTip={() => openStorageTip(item)}
+                  onRescue={() => router.push('/(tabs)/recipes')}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* ── SECTION 2: USE THIS WEEK (Soon) ── */}
+          {weekItems.length > 0 && (
+            <View style={styles.sectionWrap}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionBullet, { backgroundColor: palette.amberDeep }]} />
+                <Text style={[type.h2, { color: colors.text }]}>Use This Week</Text>
+                <View style={[styles.sectionCountBadge, { backgroundColor: '#FEF3C7' }]}>
+                  <Text style={[type.monoBold, { color: palette.amberDeep, fontSize: 10 }]}>{weekItems.length}</Text>
                 </View>
+              </View>
+
+              {weekItems.map((item) => (
+                <PantryItemCard
+                  key={item.id}
+                  item={item}
+                  onConsume={() => handleConsume(item)}
+                  onFreeze={() => handleFreeze(item)}
+                  onDonate={() => handleDonate(item)}
+                  onDiscard={() => handleDiscard(item)}
+                  onTip={() => openStorageTip(item)}
+                  onRescue={() => router.push('/(tabs)/recipes')}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* ── SECTION 3: STABLE & SHELF-SAFE ── */}
+          {stableItems.length > 0 && (
+            <View style={styles.sectionWrap}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionBullet, { backgroundColor: palette.sageDeep }]} />
+                <Text style={[type.h2, { color: colors.text }]}>Stable & Shelf-Safe</Text>
+                <View style={[styles.sectionCountBadge, { backgroundColor: palette.sageMist }]}>
+                  <Text style={[type.monoBold, { color: palette.sageDeep, fontSize: 10 }]}>{stableItems.length}</Text>
+                </View>
+              </View>
+
+              {stableItems.map((item) => (
+                <PantryItemCard
+                  key={item.id}
+                  item={item}
+                  onConsume={() => handleConsume(item)}
+                  onFreeze={() => handleFreeze(item)}
+                  onDonate={() => handleDonate(item)}
+                  onDiscard={() => handleDiscard(item)}
+                  onTip={() => openStorageTip(item)}
+                  onRescue={() => router.push('/(tabs)/recipes')}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* Empty State */}
+          {!loading && filteredItems.length === 0 && (
+            <EmptyState
+              icon={Boxes}
+              title={searchQuery ? 'No Matching Items' : 'Pantry is Empty'}
+              message={
+                searchQuery
+                  ? `No pantry items matched "${searchQuery}". Clear your search or scan fresh groceries.`
+                  : 'Start by scanning your groceries or adding food items to track shelf-life and rescue recipes.'
+              }
+              actionLabel="Scan Groceries"
+              onAction={() => router.push('/scan')}
+            />
+          )}
+        </ScrollView>
+      )}
+
+      {/* ── CONTEXTUAL STORAGE TIP MODAL ── */}
+      {tipItem && (
+        <Modal transparent animationType="fade" visible={Boolean(tipItem)}>
+          <View style={styles.modalBackdrop}>
+            <SurfaceCard style={styles.tipCard} variant="elevated">
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <BookOpen size={20} color={palette.sageDeep} strokeWidth={2.2} />
+                  <Text style={[type.h2, { color: colors.text }]}>{tipItem.name} Storage</Text>
+                </View>
+                <TouchableOpacity onPress={() => setTipItem(null)} accessibilityLabel="Close storage tips">
+                  <X size={20} color={colors.subText} />
+                </TouchableOpacity>
+              </View>
+
+              {loadingTip ? (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={palette.sageDeep} />
+                  <Text style={[type.bodySm, { color: colors.subText, marginTop: 8 }]}>Loading preservation tips...</Text>
+                </View>
+              ) : (
+                <Text style={[type.body, { color: colors.text, lineHeight: 22 }]}>
+                  {tipInsight || getStorageTip(tipItem.name)}
+                </Text>
               )}
 
-              <View style={{ marginTop: spacing[5], marginBottom: spacing[6] }}>
-                <Label>NUTRITION (per 100g)</Label>
-                <View style={styles.nutriGrid}>
-                  <NutriBox label="Calories" value={insight?.calories || (food ? food.kcal.toString() : '-')} colors={colors} />
-                  <NutriBox label="Protein" value={food ? `${food.proteinG}g` : '-'} colors={colors} />
-                  <NutriBox label="Carbs" value={food ? `${food.carbG}g` : '-'} colors={colors} />
-                  <NutriBox label="Fiber" value={food ? `${food.fiberG}g` : '-'} colors={colors} />
+              <View style={{ marginTop: spacing[5] }}>
+                <PrimaryAction label="Got it" onPress={() => setTipItem(null)} variant="sage" />
+              </View>
+            </SurfaceCard>
+          </View>
+        </Modal>
+      )}
+
+      {/* ── MANUAL ADD MODAL ── */}
+      {addModalVisible && (
+        <Modal transparent animationType="slide" visible={addModalVisible}>
+          <View style={styles.modalBackdrop}>
+            <SurfaceCard style={styles.tipCard} variant="elevated">
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <Text style={[type.h2, { color: colors.text }]}>Add Pantry Item</Text>
+                <TouchableOpacity onPress={() => setAddModalVisible(false)} accessibilityLabel="Close add modal">
+                  <X size={20} color={colors.subText} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>FOOD NAME</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g. Organic Baby Spinach"
+                placeholderTextColor={colors.subText}
+                value={newItemName}
+                onChangeText={setNewItemName}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>QUANTITY</Text>
+                  <TextInput
+                    style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                    keyboardType="numeric"
+                    value={newItemQty}
+                    onChangeText={setNewItemQty}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>DAYS LEFT</Text>
+                  <TextInput
+                    style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                    keyboardType="numeric"
+                    value={newItemDays}
+                    onChangeText={setNewItemDays}
+                  />
                 </View>
               </View>
-            </ScrollView>
-          )}
-        </View>
-      </View>
-    </Modal>
+
+              <View style={{ marginTop: spacing[5], gap: 10 }}>
+                <PrimaryAction label="Save Item" onPress={handleSaveNewItem} variant="sage" />
+                <SecondaryAction label="Cancel" onPress={() => setAddModalVisible(false)} />
+              </View>
+            </SurfaceCard>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 }
 
-function NutriBox({ label, value, colors }: { label: string; value: any; colors: any }) {
+// ─────────────────────────────────────────────────────────────────
+// PANTRY ITEM CARD COMPONENT
+// ─────────────────────────────────────────────────────────────────
+
+interface PantryItemCardProps {
+  item: InventoryRow;
+  onConsume: () => void;
+  onFreeze: () => void;
+  onDonate: () => void;
+  onDiscard: () => void;
+  onTip: () => void;
+  onRescue: () => void;
+}
+
+function PantryItemCard({
+  item,
+  onConsume,
+  onFreeze,
+  onDonate,
+  onDiscard,
+  onTip,
+  onRescue,
+}: PantryItemCardProps) {
+  const { colors } = useTheme();
+  const days = daysLeft(item.expires_at);
+
   return (
-    <View style={{ borderWidth: 1.5, borderColor: colors.border, padding: spacing[3], flex: 1, minWidth: '47%', borderRadius: 12, backgroundColor: colors.surface }}>
-      <Text style={[type.h2, { fontSize: 18, color: colors.text }]}>{value}</Text>
-      <Text style={[type.bodySm, { color: colors.subText, marginTop: 4 }]}>{label}</Text>
-    </View>
+    <SurfaceCard style={styles.itemCard} variant="elevated">
+      <View style={styles.itemMainRow}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <FreshnessBadge daysLeft={days} />
+            <Text style={[type.monoBold, { color: colors.subText, fontSize: 11, textTransform: 'capitalize' }]}>
+              {item.category.replace('_', ' ')}
+            </Text>
+          </View>
+          <Text style={[type.h3, { color: colors.text, fontFamily: font.sansBold, fontSize: 16 }]}>
+            {item.name}
+          </Text>
+          <Text style={[type.bodySm, { color: colors.subText, marginTop: 2 }]}>
+            {item.quantity ? `${item.quantity} ${item.unit || ''}` : '1 package'}
+          </Text>
+        </View>
+
+        {/* Tip & Rescue CTAs */}
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          <TouchableOpacity
+            onPress={onTip}
+            style={[styles.tipBtn, { backgroundColor: colors.paperBg, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Storage tips for ${item.name}`}
+          >
+            <Info size={14} color={palette.sageDeep} />
+            <Text style={[type.monoBold, { color: palette.sageDeep, fontSize: 10, marginLeft: 4 }]}>TIPS</Text>
+          </TouchableOpacity>
+
+          {days <= 3 && (
+            <TouchableOpacity
+              onPress={onRescue}
+              style={[styles.rescuePill, { backgroundColor: '#FEF3C7' }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Find rescue recipes for ${item.name}`}
+            >
+              <ChefHat size={12} color={palette.amberDeep} />
+              <Text style={[type.monoBold, { color: palette.amberDeep, fontSize: 10, marginLeft: 4 }]}>RESCUE</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* 4 Action Buttons Row: Consumed, Freeze, Donate, Discard */}
+      <View style={[styles.actionRow, { borderTopColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={onConsume}
+          accessibilityRole="button"
+          accessibilityLabel={`Mark ${item.name} as consumed`}
+        >
+          <Check size={16} color={palette.sageDeep} strokeWidth={2.4} />
+          <Text style={[styles.actionBtnText, { color: palette.sageDeep }]}>Eaten</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={onFreeze}
+          accessibilityRole="button"
+          accessibilityLabel={`Freeze ${item.name}`}
+        >
+          <Snowflake size={15} color="#0284C7" strokeWidth={2.2} />
+          <Text style={[styles.actionBtnText, { color: '#0284C7' }]}>Freeze</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={onDonate}
+          accessibilityRole="button"
+          accessibilityLabel={`Donate ${item.name}`}
+        >
+          <HeartHandshake size={15} color={palette.amberDeep} strokeWidth={2.2} />
+          <Text style={[styles.actionBtnText, { color: palette.amberDeep }]}>Donate</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={onDiscard}
+          accessibilityRole="button"
+          accessibilityLabel={`Discard ${item.name}`}
+        >
+          <Trash2 size={15} color={palette.crimson} strokeWidth={2.2} />
+          <Text style={[styles.actionBtnText, { color: palette.crimson }]}>Discard</Text>
+        </TouchableOpacity>
+      </View>
+    </SurfaceCard>
   );
 }
 
 const styles = StyleSheet.create({
-  container:          { flex: 1 },
-  segmentContainer: {
-    flexDirection: 'row',
-    marginHorizontal: spacing[4],
-    marginBottom: spacing[3],
-    padding: 4,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
-  segmentBtn: {
+  container: {
     flex: 1,
-    paddingVertical: 9,
+  },
+  scroll: {
+    flex: 1,
+  },
+  segmentContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 3,
+  },
+  segmentTab: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
+    gap: 6,
+    minHeight: 44,
+  },
+  segmentLabel: {
+    fontSize: 12,
+    fontFamily: font.sansBold,
+    letterSpacing: 0.3,
+  },
+  segmentBadge: {
+    backgroundColor: palette.crimson,
+    paddingHorizontal: 5,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentBadgeText: {
+    color: palette.chalk,
+    fontSize: 9,
+    fontFamily: font.sansBold,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing[3],
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 46,
+    marginBottom: spacing[3],
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontFamily: font.sans,
+    fontSize: 14,
+  },
+  categoryScroll: {
+    marginBottom: spacing[4],
+  },
+  catChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 10,
+    borderWidth: 1,
+    marginRight: 8,
+    minHeight: 36,
+    justifyContent: 'center',
   },
-  segmentText: {
-    fontSize: 13,
+  catChipText: {
+    fontFamily: font.sansBold,
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
-  scroll:             { flex: 1, paddingHorizontal: spacing[4] },
-  headerRow:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[3] },
-  screenTitle:        { fontSize: 28, fontFamily: font.sansBold, letterSpacing: -0.5 },
-  screenSub:          { fontSize: 13, fontFamily: font.sans, marginTop: 2 },
-  filterBtn:          { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  alertBanner:        { flexDirection: 'row', alignItems: 'center', padding: spacing[3], marginBottom: spacing[3], borderRadius: 12, borderWidth: 1.5 },
-  controlsBox:        { borderWidth: 1.5, borderRadius: 14, padding: spacing[4], marginBottom: spacing[3] },
-  controlLabel:       { fontSize: 10, fontFamily: font.sansBold, letterSpacing: 1, marginBottom: 8 },
-  chipRow:            { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  controlChip:        { paddingVertical: 7, paddingHorizontal: 14, borderWidth: 1.5, borderRadius: 20 },
-  controlChipText:    { fontSize: 12, fontFamily: font.sansBold, textTransform: 'capitalize' },
-  emptyBox:           { alignItems: 'center', padding: spacing[8], borderWidth: 1.5, borderRadius: 20, marginTop: spacing[4] },
-  itemCard:           { flexDirection: 'row', borderWidth: 1.5, borderRadius: 16, marginBottom: spacing[3], overflow: 'hidden', shadowColor: palette.ink, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  freshnessStripe:    { width: 5 },
-  itemContent:        { flex: 1, padding: spacing[4] },
-  itemTop:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  itemName:           { fontSize: 16, fontFamily: font.sansBold, flex: 1, marginRight: 8 },
-  nutriRow:           { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3] },
-  actionRow:          { flexDirection: 'row', marginTop: spacing[3], gap: 8 },
-  actionBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
-  actionBtnText:      { fontSize: 10, fontFamily: font.sansBold, letterSpacing: 1 },
-  fab:                { position: 'absolute', right: spacing[5] } as any,
-  fabInner:           { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', shadowColor: palette.ink, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 },
-  modalOverlay:       { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalSheet:         { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: spacing[5], paddingBottom: 40, paddingTop: 12 },
-  modalHandle:        { width: 40, height: 4, borderRadius: 2, backgroundColor: palette.mist2, alignSelf: 'center', marginBottom: spacing[4] },
-  modalHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[4] },
-  closeBtn:           { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  searchInput:        { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: font.sans, fontSize: 15, marginBottom: spacing[3] },
-  suggestRow:         { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderBottomWidth: 1 },
-  nutriGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: spacing[3] },
-  stepRow:            { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  ingDot:             { width: 8, height: 8, borderRadius: 4 },
+  sectionWrap: {
+    marginBottom: spacing[4],
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionBullet: {
+    width: 3.5,
+    height: 18,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  sectionCountBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  itemCard: {
+    padding: spacing[3],
+    borderRadius: 18,
+    marginBottom: 10,
+  },
+  itemMainRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  tipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 32,
+  },
+  rescuePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    minHeight: 32,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingTop: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 44,
+  },
+  actionBtnText: {
+    fontFamily: font.sansBold,
+    fontSize: 11,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  tipCard: {
+    width: '100%',
+    maxWidth: 380,
+    padding: spacing[5],
+  },
+  modalInput: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontFamily: font.sans,
+    fontSize: 14,
+  },
 });
-

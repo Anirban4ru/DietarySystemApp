@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import {
   Leaf, Check, AlertCircle, ChefHat, Heart,
-  ShoppingCart, X, Sparkles, Star, Dice5,
+  ShoppingCart, X, Sparkles, Star, Dice5, Calendar,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -77,7 +77,7 @@ export default function RecipesScreen() {
     await logEvent('rescue_meal', avoided, { recipe: c.name });
     await addXp(xpForMeal(avoided));
     setSelected(c.name);
-    toast.show(`${c.name} cooked! 🎉 +XP`, 'success');
+    toast.show(`${c.name} cooked! Logged +XP`, 'success');
     setTimeout(() => setSelected(null), 3000);
   };
 
@@ -136,7 +136,7 @@ export default function RecipesScreen() {
         instructions: generated.instructions, // pass instructions to detail view
       } as any;
       setDetail(candidate);
-      toast.show('Roulette recipe ready! 🎲', 'success');
+      toast.show('Roulette recipe ready!', 'success');
     } catch (e: any) {
       console.error("AI Roulette Error:", e);
       toast.show(e.message || 'AI unavailable, try again', 'error');
@@ -152,26 +152,32 @@ export default function RecipesScreen() {
           activeOpacity={0.8}
           style={[
             styles.segmentBtn,
-            mainTab === 'recipes' && { backgroundColor: palette.sageDeep }
+            mainTab === 'recipes' && { backgroundColor: palette.forestDeep }
           ]}
           onPress={() => { Haptics.selectionAsync(); setMainTab('recipes'); }}
         >
-          <Text style={[styles.segmentText, { color: mainTab === 'recipes' ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>
-            🍳 AI Rescue Recipes
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <ChefHat size={16} color={mainTab === 'recipes' ? palette.chalk : colors.subText} strokeWidth={2.5} />
+            <Text style={[styles.segmentText, { color: mainTab === 'recipes' ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>
+              Rescue Recipes
+            </Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
           style={[
             styles.segmentBtn,
-            mainTab === 'plan' && { backgroundColor: palette.sageDeep }
+            mainTab === 'plan' && { backgroundColor: palette.forestDeep }
           ]}
           onPress={() => { Haptics.selectionAsync(); setMainTab('plan'); }}
         >
-          <Text style={[styles.segmentText, { color: mainTab === 'plan' ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>
-            📅 Weekly Meal Plan
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Calendar size={16} color={mainTab === 'plan' ? palette.chalk : colors.subText} strokeWidth={2.5} />
+            <Text style={[styles.segmentText, { color: mainTab === 'plan' ? palette.chalk : colors.text, fontFamily: font.sansBold }]}>
+              Meal Plan
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -400,7 +406,7 @@ function RecipeCard({ c, index, selected, isFav, onCook, onFav, onShop, onDetail
                 ? <Check size={15} color={palette.chalk} strokeWidth={2.8} />
                 : <ChefHat size={15} color={palette.chalk} strokeWidth={2.5} />}
               <Text style={styles.actionBtnText}>
-                {selected ? 'COOKED ✓' : 'COOK'}
+                {selected ? 'COOKED' : 'COOK'}
               </Text>
             </View>
           </PressScale>
