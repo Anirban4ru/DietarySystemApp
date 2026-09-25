@@ -106,7 +106,10 @@ export default function RecipesScreen() {
         missing: [],
         substitutions: [],
         co2eKg: 0,
-        nutrition: generated.nutrition,
+        nutrition: {
+          ...generated.nutrition,
+          vitC: 0, vitA: 0, calcium: 0, potassium: 0,
+        },
         wasteScore: 1,
         rdaScore: 1,
         completeness: 1,

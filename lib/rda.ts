@@ -56,18 +56,26 @@ export function computeRDA(p: ProfileRow): RDA {
     potassium = 4700;
   }
   if (p.conditions.includes('diabetes')) {
-    // lower carb ratio to 25%, increase fat to 40%, protein to 35% to weight glycemic impact
-    carbG = Math.round((tdee * 0.25) / 4);
-    fatG = Math.round((tdee * 0.40) / 9);
-    proteinG = Math.round((tdee * 0.35) / 4);
+    // General dietary guidance only — not medical advice.
+    // Standard diabetes-friendly approach: reduce carb % to ~40% of TDEE
+    // (from 45%), redistribute to protein (25%) and fat (35%) to reduce
+    // glycemic load. Increase fiber target for better glucose management.
+    carbG = Math.round((tdee * 0.40) / 4);
+    proteinG = Math.round((tdee * 0.25) / 4);
+    fatG = Math.round((tdee * 0.35) / 9);
+    // Bump fiber: 35-38g is recommended for better glycemic control
+    // (overrides the age-based default above)
   }
+  // Diabetes + higher fiber target
+  const fiberTarget = p.conditions.includes('diabetes') ? 38 : fiberG;
+
 
   return {
     kcal: tdee,
     proteinG,
     carbG,
     fatG,
-    fiberG,
+    fiberG: fiberTarget,
     vitC,
     vitA,
     calcium,

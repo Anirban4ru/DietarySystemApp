@@ -33,7 +33,7 @@ export interface ProContextType {
   restorePurchases: () => Promise<boolean>;
 }
 
-const ProContext = createContext<ProContextType>({
+export const ProContext = createContext<ProContextType>({
   isPro: false,
   setIsPro: () => {},
   unlockPro: async () => {},
@@ -822,14 +822,15 @@ export function useShoppingList() {
       return;
     }
 
-    const checked = items.filter((i) => i.checked);
-    for (const item of checked) {
-      await supabase
-        .from('shopping_list')
-        .delete()
-        .eq('id', item.id)
-        .eq('user_id', user.id);
-    }
+    const checkedIds = items.filter((i) => i.checked).map((i) => i.id);
+    if (checkedIds.length === 0) return;
+
+    // Single batch delete — one DB round trip instead of N
+    await supabase
+      .from('shopping_list')
+      .delete()
+      .in('id', checkedIds)
+      .eq('user_id', user.id);
     setItems((prev) => prev.filter((i) => !i.checked));
   }, [items]);
 
@@ -1042,28 +1043,12 @@ export function useXp() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const newXp = xp + amount;
-    if (id) {
-      const { data } = await supabase
-        .from('xp_state')
-        .update({ total_xp: newXp, user_id: user.id, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-      if (data) setXp((data as any).total_xp);
-    } else {
-      const { data } = await supabase
-        .from('xp_state')
-        .insert({ user_id: user.id, total_xp: newXp })
-        .select()
-        .single();
-      if (data) {
-        setXp((data as any).total_xp);
-        setId((data as any).id);
-      }
+    // Atomic increment via Postgres function — eliminates read-then-write race condition
+    const { data, error } = await supabase.rpc('increment_xp', { delta: amount });
+    if (!error && typeof data === 'number') {
+      setXp(data);
     }
-  }, [xp, id]);
+  }, []);
 
   return { xp, loading, addXp };
 }

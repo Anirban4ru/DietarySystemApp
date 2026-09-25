@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Component, ReactNode } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -24,6 +25,51 @@ import { PaywallModal } from '@/components/PaywallModal';
 
 SplashScreen.preventAutoHideAsync();
 
+// ── Top-level ErrorBoundary ───────────────────────────────────────────────────
+// Catches any uncaught render errors and shows a recovery screen instead of
+// a blank white screen or a crash.
+interface EBState { hasError: boolean; message: string }
+class AppErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+  static getDerivedStateFromError(error: Error): EBState {
+    return { hasError: true, message: error.message };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error('[ErrorBoundary]', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={ebStyles.container}>
+          <Text style={ebStyles.emoji}>😵</Text>
+          <Text style={ebStyles.title}>Something went wrong</Text>
+          <Text style={ebStyles.sub}>{this.state.message || 'An unexpected error occurred.'}</Text>
+          <TouchableOpacity
+            style={ebStyles.btn}
+            onPress={() => this.setState({ hasError: false, message: '' })}
+          >
+            <Text style={ebStyles.btnText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const ebStyles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#0f1f0f' },
+  emoji:     { fontSize: 56, marginBottom: 16 },
+  title:     { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 8 },
+  sub:       { fontSize: 14, color: '#aaa', textAlign: 'center', marginBottom: 32 },
+  btn:       { backgroundColor: '#4CAF8F', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 24 },
+  btnText:   { color: '#fff', fontWeight: '700', fontSize: 16 },
+});
+
+// ── Root layout ───────────────────────────────────────────────────────────────
 export default function RootLayout() {
   useFrameworkReady();
 
@@ -66,7 +112,7 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Sync scheduled reminders
+  // Sync scheduled reminders (in parallel with auth — independent)
   useEffect(() => {
     getNotificationPreferences().then((prefs) => {
       syncScheduledNotifications(prefs);
@@ -93,17 +139,19 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <ProProvider>
-          <AppContent />
-          <PaywallModal />
-        </ProProvider>
-        <UpdateOverlay />
-        {/* Animated splash overlay — hides once appReady */}
-        <SplashOverlay visible={!appReady} />
-      </ToastProvider>
-    </ThemeProvider>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
+          <ProProvider>
+            <AppContent />
+            <PaywallModal />
+          </ProProvider>
+          <UpdateOverlay />
+          {/* Animated splash overlay — hides once appReady */}
+          <SplashOverlay visible={!appReady} />
+        </ToastProvider>
+      </ThemeProvider>
+    </AppErrorBoundary>
   );
 }
 

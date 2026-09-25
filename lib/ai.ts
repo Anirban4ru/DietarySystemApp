@@ -1,4 +1,14 @@
 import { supabase } from './supabase';
+import {
+  validateAI,
+  RecipeSchema,
+  MealSuggestionsSchema,
+  TipInsightSchema,
+  GroceryItemsSchema,
+  ReceiptItemsSchema,
+  NaturalLanguagePantrySchema,
+  DetectedFoodSchema,
+} from './validators';
 
 async function invokeGemini(action: string, payload: any) {
   const { data, error } = await supabase.functions.invoke('gemini-api', {
@@ -26,66 +36,69 @@ async function invokeGemini(action: string, payload: any) {
   throw new Error("Invalid response from Edge Function");
 }
 
-export async function generateStrictRecipe(inventoryItems: { name: string, quantity: number, unit: string }[]): Promise<any> {
-  return invokeGemini('generateStrictRecipe', { inventoryItems });
+export async function generateStrictRecipe(
+  inventoryItems: { name: string; quantity: number; unit: string }[]
+) {
+  const raw = await invokeGemini('generateStrictRecipe', { inventoryItems });
+  return validateAI(RecipeSchema, raw);
 }
 
-// Search for a meal/recipe by name using AI — returns full recipe details
-export async function searchMealByName(mealName: string): Promise<{
-  name: string;
-  ingredients: { name: string; grams: number }[];
-  instructions: string[];
-  nutrition: { kcal: number; proteinG: number; carbG: number; fatG: number; fiberG: number; iron: number };
-}> {
-  return invokeGemini('searchMealByName', { mealName });
+export async function searchMealByName(mealName: string) {
+  const raw = await invokeGemini('searchMealByName', { mealName });
+  return validateAI(RecipeSchema, raw);
 }
 
-// Get meal name suggestions
 export async function searchMealSuggestions(query: string): Promise<string[]> {
   try {
-    return await invokeGemini('searchMealSuggestions', { query });
+    const raw = await invokeGemini('searchMealSuggestions', { query });
+    return validateAI(MealSuggestionsSchema, raw);
   } catch {
     return [];
   }
 }
 
-// Get rich food tip insights
-export async function getTipInsight(foodName: string, daysRemaining: number): Promise<{
-  recipes: string[];
-  freshness: string;
-  calories: string;
-}> {
+export async function getTipInsight(
+  foodName: string,
+  daysRemaining: number
+): Promise<{ recipes: string[]; freshness: string; calories: string }> {
   try {
-    return await invokeGemini('getTipInsight', { foodName, daysRemaining });
+    const raw = await invokeGemini('getTipInsight', { foodName, daysRemaining });
+    return validateAI(TipInsightSchema, raw);
   } catch {
     return { recipes: [], freshness: '', calories: '' };
   }
 }
 
-// Search for food/grocery items using AI
-export async function searchGroceryItems(query: string): Promise<{
-  items: { name: string; category: string; emoji: string }[];
-}> {
+export async function searchGroceryItems(
+  query: string
+): Promise<{ items: { name: string; category: string; emoji: string }[] }> {
   try {
-    return await invokeGemini('searchGroceryItems', { query });
+    const raw = await invokeGemini('searchGroceryItems', { query });
+    return validateAI(GroceryItemsSchema, raw);
   } catch {
     return { items: [] };
   }
 }
 
-export async function parseReceipt(base64Image: string): Promise<any> {
-  return invokeGemini('parseReceipt', { base64Image });
+export async function parseReceipt(base64Image: string) {
+  const raw = await invokeGemini('parseReceipt', { base64Image });
+  return validateAI(ReceiptItemsSchema, raw);
 }
 
-// Parse natural language dictation into pantry items
-export async function parseNaturalLanguagePantry(text: string): Promise<{name: string, quantity: number, unit: string}[]> {
+export async function parseNaturalLanguagePantry(
+  text: string
+): Promise<{ name: string; quantity: number; unit: string }[]> {
   try {
-    return await invokeGemini('parseNaturalLanguagePantry', { text });
+    const raw = await invokeGemini('parseNaturalLanguagePantry', { text });
+    return validateAI(NaturalLanguagePantrySchema, raw);
   } catch {
     return [];
   }
 }
 
-export async function detectFoodItem(base64Image: string): Promise<{ name: string; freshness: number; confidence: number }> {
-  return invokeGemini('detectFoodItem', { base64Image });
+export async function detectFoodItem(
+  base64Image: string
+): Promise<{ name: string; freshness: number; confidence: number }> {
+  const raw = await invokeGemini('detectFoodItem', { base64Image });
+  return validateAI(DetectedFoodSchema, raw);
 }
