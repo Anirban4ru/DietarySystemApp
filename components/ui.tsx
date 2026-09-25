@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticError } from '@/lib/haptics';
 import {
   Leaf, CheckCircle2, AlertTriangle, Info, Crown,
   ChevronRight, RefreshCw, X, ShieldAlert,
@@ -59,8 +59,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem('theme_mode').then((val) => {
-      if (val === 'dark' || val === 'light') setMode(val);
-      else setMode(Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
+      if (val === 'dark' || val === 'light') {
+        setMode(val);
+      } else {
+        // Default mode is strictly light mode
+        setMode('light');
+        AsyncStorage.setItem('theme_mode', 'light').catch(() => {});
+      }
     });
   }, []);
 
@@ -75,15 +80,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const colors = {
     ...palette,
     bg:              mode === 'light' ? palette.bone        : palette.darkBg,
-    surface:         mode === 'light' ? palette.chalk       : palette.darkSurface,
-    surfaceElevated: mode === 'light' ? '#FFFFFF'           : '#24201D',
+    surface:         mode === 'light' ? palette.paper       : palette.darkSurface,
+    surfaceElevated: mode === 'light' ? palette.chalk       : '#142C27',
     text:            mode === 'light' ? palette.ink         : palette.darkText,
     subText:         mode === 'light' ? palette.slate2      : palette.darkMist,
-    border:          mode === 'light' ? palette.hair        : palette.darkBorder,
+    border:          mode === 'light' ? 'rgba(2, 51, 45, 0.08)' : palette.darkBorder,
     borderDark:      palette.hairLight,
-    paperBg:         mode === 'light' ? palette.paper       : '#181513',
-    primaryAction:   palette.sageDeep,
-    cardBorder:      mode === 'light' ? 'rgba(0,0,0,0.06)'  : 'rgba(255,255,255,0.07)',
+    paperBg:         mode === 'light' ? '#EFE8DC'           : '#0A1815',
+    primaryAction:   palette.royalGreen,
+    cardBorder:      mode === 'light' ? 'rgba(2, 51, 45, 0.06)' : 'rgba(218, 207, 189, 0.1)',
   };
 
   return <Ctx.Provider value={{ mode, toggle, colors }}>{children}</Ctx.Provider>;
@@ -94,98 +99,110 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 // ─────────────────────────────────────────────────────────────────
 
 export function SplashOverlay({ visible }: { visible: boolean }) {
-  const fadeOut  = useRef(new Animated.Value(1)).current;
-  const leafScale = useRef(new Animated.Value(0.4)).current;
-  const leafOpacity = useRef(new Animated.Value(0)).current;
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const titleY   = useRef(new Animated.Value(16)).current;
-  const tagOpacity = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(true);
+  const fadeOut       = useRef(new Animated.Value(1)).current;
+  const crestScale    = useRef(new Animated.Value(0.6)).current;
+  const crestOpacity  = useRef(new Animated.Value(0)).current;
+  const titleOpacity  = useRef(new Animated.Value(0)).current;
+  const titleY        = useRef(new Animated.Value(20)).current;
+  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const progressAnim  = useRef(new Animated.Value(0)).current;
+  const [statusMsg, setStatusMsg] = useState('INITIALIZING BIO-WORKSPACE...');
 
   useEffect(() => {
+    // 1. Fluid progress bar sequence
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 1500,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: false,
+    }).start();
+
+    // 2. Staggered crest & typography entrance
     Animated.sequence([
       Animated.parallel([
-        Animated.spring(leafScale,   { toValue: 1, useNativeDriver: true, speed: 8, bounciness: 10 }),
-        Animated.timing(leafOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.spring(crestScale, { toValue: 1, speed: 8, bounciness: 4, useNativeDriver: true }),
+        Animated.timing(crestOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(titleY,       { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 4 }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
+        Animated.spring(titleY, { toValue: 0, speed: 12, bounciness: 4, useNativeDriver: true }),
       ]),
-      Animated.timing(tagOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(subtitleOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
     ]).start();
+
+    // Dynamic luxury status sequence
+    const t1 = setTimeout(() => setStatusMsg('CALIBRATING NUTRITIONAL ENGINE...'), 500);
+    const t2 = setTimeout(() => setStatusMsg('CURATING PERSONALIZED KITCHEN...'), 1000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, []);
 
   useEffect(() => {
     if (!visible) {
       Animated.timing(fadeOut, {
         toValue: 0,
-        duration: 500,
+        duration: 450,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        setMounted(false);
+      });
     }
   }, [visible]);
 
-  if (!visible && (fadeOut as any)._value === 0) return null;
+  if (!mounted) return null;
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <Animated.View
       style={[StyleSheet.absoluteFillObject, styles.splashContainer, { opacity: fadeOut }]}
       pointerEvents={visible ? 'auto' : 'none'}
     >
+      {/* Background ambient luxury aura */}
       <View style={styles.splashBg} />
-      <View style={styles.splashCircle1} />
-      <View style={styles.splashCircle2} />
+      <View style={styles.splashHalo} />
+      <View style={styles.splashGlowRing} />
 
       <View style={styles.splashContent}>
-        <Animated.View style={[styles.splashIconWrap, { transform: [{ scale: leafScale }], opacity: leafOpacity }]}>
-          <Leaf size={40} color={palette.chalk} fill={palette.chalk} strokeWidth={1} />
+        {/* Heraldic Crest Emblem */}
+        <Animated.View style={[styles.splashIconWrap, { transform: [{ scale: crestScale }], opacity: crestOpacity }]}>
+          <View style={styles.splashIconInner}>
+            <Leaf size={44} color={palette.goldenDays} fill={palette.goldenDays} strokeWidth={1.2} />
+          </View>
         </Animated.View>
 
+        {/* Primary Luxury Brand */}
         <Animated.Text style={[styles.splashTitle, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}>
-          DIETARY SYSTEM
+          NOURISH
         </Animated.Text>
 
-        <Animated.Text style={[styles.splashTag, { opacity: tagOpacity }]}>
-          INTELLIGENT KITCHEN COMPANION
+        <Animated.Text style={[styles.splashTag, { opacity: subtitleOpacity }]}>
+          INTELLIGENT DIETARY SYSTEMS
+        </Animated.Text>
+
+        <Animated.Text style={[styles.splashEditorial, { opacity: subtitleOpacity }]}>
+          Precision Culinary &amp; Nutritional Intelligence
+        </Animated.Text>
+
+        {/* Progress Bar Container */}
+        <Animated.View style={[styles.splashProgressTrack, { opacity: subtitleOpacity }]}>
+          <Animated.View style={[styles.splashProgressFill, { width: progressWidth }]} />
+        </Animated.View>
+
+        {/* Live Status Label */}
+        <Animated.Text style={[styles.splashStatus, { opacity: subtitleOpacity }]}>
+          {statusMsg}
         </Animated.Text>
       </View>
-
-      <Animated.View style={[styles.splashDots, { opacity: tagOpacity }]}>
-        <LoadingDots />
-      </Animated.View>
     </Animated.View>
-  );
-}
-
-function LoadingDots() {
-  const dots = [
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-  ];
-
-  useEffect(() => {
-    const animations = dots.map((d, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 180),
-          Animated.timing(d, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(d, { toValue: 0.3, duration: 300, useNativeDriver: true }),
-          Animated.delay(540 - i * 180),
-        ])
-      )
-    );
-    animations.forEach(a => a.start());
-    return () => animations.forEach(a => a.stop());
-  }, []);
-
-  return (
-    <View style={{ flexDirection: 'row', gap: 8 }}>
-      {dots.map((d, i) => (
-        <Animated.View key={i} style={[styles.dot, { opacity: d }]} />
-      ))}
-    </View>
   );
 }
 
@@ -194,10 +211,11 @@ function LoadingDots() {
 // ─────────────────────────────────────────────────────────────────
 
 export function PressScale({
-  children, onPress, style, scale = 0.96, disabled,
+  children, onPress, style, scale = 0.96, disabled, accessibilityRole, accessibilityLabel,
 }: {
   children: ReactNode; onPress?: () => void;
   style?: StyleProp<ViewStyle>; scale?: number; disabled?: boolean;
+  accessibilityRole?: any; accessibilityLabel?: string;
 }) {
   return (
     <PressableScale
@@ -205,6 +223,8 @@ export function PressScale({
       disabled={disabled}
       scale={scale}
       style={style}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
     >
       {children}
     </PressableScale>
@@ -297,9 +317,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       setCurrent(next);
       setQueue((q) => q.slice(1));
 
-      if (next.type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      else if (next.type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (next.type === 'error') hapticError();
+      else if (next.type === 'success') hapticSuccess();
+      else hapticTap();
 
       Animated.parallel([
         Animated.spring(anim, { toValue: 0, useNativeDriver: true, speed: 22, bounciness: 5 }),
@@ -463,7 +483,6 @@ export function SectionHeader({ title, subtitle, rightAction, colors: colorsOver
 
   return (
     <View style={styles.sectionHeaderRow}>
-      <View style={[styles.sectionAccent, { backgroundColor: palette.sageDeep }]} />
       <View style={{ flex: 1 }}>
         <Text style={[type.h2, { color: colors.text }]}>{title}</Text>
         {subtitle && (
@@ -1163,67 +1182,109 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.sageDeep,
+    backgroundColor: '#02332D', // Signature Royal Green Qilin
   },
   splashBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: palette.sageDeep,
+    backgroundColor: '#02332D',
   },
-  splashCircle1: {
+  splashHalo: {
     position: 'absolute',
-    width: SCREEN_W * 1.4,
-    height: SCREEN_W * 1.4,
-    borderRadius: SCREEN_W * 0.7,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    top: -SCREEN_W * 0.5,
-    left: -SCREEN_W * 0.2,
+    width: SCREEN_W * 1.5,
+    height: SCREEN_W * 1.5,
+    borderRadius: SCREEN_W * 0.75,
+    borderWidth: 1.5,
+    borderColor: 'rgba(191, 152, 97, 0.12)', // Subtle Golden Days orbit
+    borderStyle: 'dashed',
   },
-  splashCircle2: {
+  splashGlowRing: {
     position: 'absolute',
-    width: SCREEN_W,
-    height: SCREEN_W,
-    borderRadius: SCREEN_W * 0.5,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    bottom: -SCREEN_W * 0.3,
-    right: -SCREEN_W * 0.2,
+    width: SCREEN_W * 0.88,
+    height: SCREEN_W * 0.88,
+    borderRadius: SCREEN_W * 0.44,
+    backgroundColor: 'rgba(191, 152, 97, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(218, 207, 189, 0.15)',
   },
   splashContent: {
     alignItems: 'center',
+    paddingHorizontal: 32,
+    width: '100%',
+    maxWidth: 420,
   },
   splashIconWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 96,
+    height: 96,
+    borderRadius: 36,
+    backgroundColor: 'rgba(2, 51, 45, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[5],
+    borderWidth: 2,
+    borderColor: '#BF9861', // Golden Days
+    shadowColor: '#BF9861',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  splashIconInner: {
+    width: 76,
+    height: 76,
+    borderRadius: 28,
+    backgroundColor: 'rgba(191, 152, 97, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(218, 207, 189, 0.3)',
   },
   splashTitle: {
-    fontFamily: font.sansBold,
-    fontSize: 22,
-    color: palette.chalk,
-    letterSpacing: 6,
+    fontFamily: font.display,
+    fontSize: 32,
+    color: '#BF9861', // Golden Days
+    letterSpacing: 8,
     marginBottom: 8,
+    fontWeight: '700' as any,
+    textAlign: 'center',
   },
   splashTag: {
-    fontFamily: font.sans,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: 3,
+    fontFamily: font.sansBold,
+    fontSize: 11,
+    color: '#DACFBD', // White Cream
+    letterSpacing: 4,
     textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 6,
   },
-  splashDots: {
-    position: 'absolute',
-    bottom: 60,
+  splashEditorial: {
+    fontFamily: font.sans,
+    fontSize: 12,
+    color: 'rgba(218, 207, 189, 0.65)',
+    letterSpacing: 1.2,
+    textAlign: 'center',
+    marginBottom: 36,
   },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+  splashProgressTrack: {
+    width: '70%',
+    maxWidth: 240,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(218, 207, 189, 0.18)',
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  splashProgressFill: {
+    height: '100%',
+    backgroundColor: '#BF9861', // Golden Days
+    borderRadius: 2,
+  },
+  splashStatus: {
+    fontFamily: font.sansMed,
+    fontSize: 10,
+    color: 'rgba(218, 207, 189, 0.75)',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    textAlign: 'center',
   },
   // Toast
   toastWrap: {

@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Check, ChevronRight, User, Target, Leaf, Heart } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticSelection } from '@/lib/haptics';
 import { palette, spacing, font, type } from '@/lib/theme';
 import { useTheme } from '@/components/ui';
 import { useProfile } from '@/lib/hooks';
@@ -68,25 +68,21 @@ export default function OnboardingScreen() {
   };
 
   const handleWelcomeNext = () => {
-    Haptics.selectionAsync();
+    hapticSelection();
     animateNext(() => setStep('personal'));
   };
 
   const handlePersonalNext = () => {
     if (!name.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert('Please enter your name to continue.');
-      } else {
-        Alert.alert('Name Required', 'Please enter your name to continue.');
-      }
+      Alert.alert('Name Required', 'Please enter your name to continue.');
       return;
     }
-    Haptics.selectionAsync();
+    hapticSelection();
     animateNext(() => setStep('goals'));
   };
 
   const handleFinish = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     setSaving(true);
     try {
       await upsert({
@@ -106,19 +102,19 @@ export default function OnboardingScreen() {
   };
 
   const handleDone = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     router.replace('/(tabs)');
   };
 
   const toggleGoal = (id: string) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     setSelectedGoals((prev) =>
       prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
     );
   };
 
   const toggleCondition = (id: Condition) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     setSelectedConditions((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     );
@@ -160,11 +156,11 @@ export default function OnboardingScreen() {
               </View>
               <Text style={styles.headline}>Namaste!</Text>
               <Text style={styles.subline}>
-                Welcome to Nourish — India's smart dietary companion. Let's set up your personal health profile.
+                Welcome to Nourish. Let's set up your personal health profile.
               </Text>
-              <Text style={styles.bulletItem}>Your data belongs only to you — completely private.</Text>
-              <Text style={styles.bulletItem}>Recipes tailored to Indian cuisine and ingredients.</Text>
-              <Text style={styles.bulletItem}>Track pantry, reduce waste, eat better.</Text>
+              <Text style={styles.bulletItem}>Your data belongs only to you and remains strictly private.</Text>
+              <Text style={styles.bulletItem}>Recipes tailored to Indian cuisine and fresh pantry ingredients.</Text>
+              <Text style={styles.bulletItem}>Track pantry shelf-life, eliminate waste, and optimize nutrition.</Text>
 
               <TouchableOpacity
                 style={styles.btnPrimary}
@@ -181,7 +177,7 @@ export default function OnboardingScreen() {
             <View style={styles.stepContent}>
               <Text style={styles.headline}>About You</Text>
               <Text style={styles.subline}>
-                Used to personalise recipes and nutrition targets. Nothing is shared.
+                Used to personalize recipes and nutrition targets. Nothing is shared.
               </Text>
 
               <Text style={styles.fieldLabel}>YOUR NAME *</Text>
@@ -189,8 +185,6 @@ export default function OnboardingScreen() {
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g. Priya, Arjun..."
-                placeholderTextColor="rgba(255,255,255,0.35)"
                 autoCapitalize="words"
               />
 
@@ -201,8 +195,6 @@ export default function OnboardingScreen() {
                     style={styles.input}
                     value={age}
                     onChangeText={setAge}
-                    placeholder="25"
-                    placeholderTextColor="rgba(255,255,255,0.35)"
                     keyboardType="numeric"
                   />
                 </View>
@@ -212,8 +204,6 @@ export default function OnboardingScreen() {
                     style={styles.input}
                     value={weight}
                     onChangeText={setWeight}
-                    placeholder="70"
-                    placeholderTextColor="rgba(255,255,255,0.35)"
                     keyboardType="numeric"
                   />
                 </View>
@@ -224,8 +214,6 @@ export default function OnboardingScreen() {
                 style={styles.input}
                 value={height}
                 onChangeText={setHeight}
-                placeholder="170"
-                placeholderTextColor="rgba(255,255,255,0.35)"
                 keyboardType="numeric"
               />
 
@@ -238,7 +226,7 @@ export default function OnboardingScreen() {
                       styles.sexChip,
                       sex === s && { backgroundColor: palette.chalk },
                     ]}
-                    onPress={() => { Haptics.selectionAsync(); setSex(s); }}
+                    onPress={() => { hapticSelection(); setSex(s); }}
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.sexChipText, sex === s && { color: palette.sageDeep }]}>

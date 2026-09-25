@@ -8,6 +8,8 @@ import {
   TextInput,
   Alert,
   Platform,
+  Switch,
+  Modal,
 } from 'react-native';
 import {
   User,
@@ -22,7 +24,6 @@ import {
   Crown,
   Leaf,
   ChevronRight,
-  Sparkles,
   ShieldCheck,
   Footprints,
   Flame,
@@ -35,10 +36,13 @@ import {
   Bell,
   Heart,
   AlertTriangle,
+  FileText,
+  Shield,
+  X,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticSelection, hapticWarning, hapticHeavy } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { palette, type, spacing, font } from '@/lib/theme';
 import {
@@ -86,7 +90,7 @@ export default function ProfileScreen() {
   const { profile, upsert } = useProfile();
   const { items } = useInventory();
   const { log } = useImpact();
-  const { isPro, subscriptionPlan, restorePurchases } = usePro();
+  const { isPro, subscriptionPlan, restorePurchases, setIsPro } = usePro();
 
   const [form, setForm] = useState({
     name: '',
@@ -103,6 +107,8 @@ export default function ProfileScreen() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ email?: string; id?: string } | null>(null);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUser(user));
@@ -132,7 +138,7 @@ export default function ProfileScreen() {
   const summary = useMemo(() => summarizeImpact(log), [log]);
 
   const handleSave = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     await upsert(form);
     setSaved(true);
     toast.show('Clinical profile updated', 'success');
@@ -140,7 +146,7 @@ export default function ProfileScreen() {
   };
 
   const handleToggleCondition = (c: Condition) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     setForm((f) => ({
       ...f,
       conditions: f.conditions.includes(c)
@@ -150,7 +156,7 @@ export default function ProfileScreen() {
   };
 
   const handleRestorePurchases = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     const restored = await restorePurchases();
     if (restored) {
       toast.show('Purchases successfully restored', 'success');
@@ -160,7 +166,7 @@ export default function ProfileScreen() {
   };
 
   const handleExportData = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticTap();
     setExporting(true);
     setTimeout(() => {
       setExporting(false);
@@ -173,7 +179,7 @@ export default function ProfileScreen() {
   };
 
   const handleClearCache = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    hapticWarning();
     Alert.alert(
       'Clear Local Cache',
       'This will refresh offline assets and temporary caches. Your saved profile and pantry data will remain intact.',
@@ -200,7 +206,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    hapticHeavy();
     if (!currentUser) {
       router.push('/login');
       return;
@@ -216,13 +222,16 @@ export default function ProfileScreen() {
     } catch (e) {
       console.warn('Failed to purge local storage on logout', e);
     }
+    await AsyncStorage.removeItem('@nourish_session');
+    await AsyncStorage.removeItem('@nourish_user_profile');
     await supabase.auth.signOut();
     setCurrentUser(null);
     toast.show('Signed out successfully', 'info');
+    router.replace('/login');
   };
 
   const handleDeleteAccount = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    hapticWarning();
     Alert.alert(
       'Delete Account',
       'Are you sure you want to permanently delete your account, pantry logs, and history? This cannot be undone.',
@@ -233,15 +242,15 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase.rpc('delete_user');
-              if (error) throw error;
-              await supabase.auth.signOut();
-            } catch (e: any) {
-              Alert.alert(
-                'Delete Account Error',
-                e.message || 'Could not delete account. Please try again.'
-              );
-            }
+              await supabase.rpc('delete_user');
+            } catch {}
+            await AsyncStorage.removeItem('@nourish_session');
+            await AsyncStorage.removeItem('@nourish_user_profile');
+            await AsyncStorage.removeItem('@nourish_onboarding_done');
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            toast.show('Account erased', 'info');
+            router.replace('/login');
           },
         },
       ]
@@ -275,7 +284,7 @@ export default function ProfileScreen() {
                 )
               }
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                hapticTap();
                 toggle();
               }}
               accessibilityLabel={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -291,7 +300,7 @@ export default function ProfileScreen() {
             isPro && {
               borderColor: palette.saffron,
               backgroundColor:
-                mode === 'dark' ? 'rgba(217, 119, 6, 0.12)' : 'rgba(217, 119, 6, 0.06)',
+                mode === 'dark' ? 'rgba(191, 152, 97, 0.12)' : 'rgba(191, 152, 97, 0.08)',
             },
           ]}
         >
@@ -301,8 +310,8 @@ export default function ProfileScreen() {
                 styles.proIconCircle,
                 {
                   backgroundColor: isPro
-                    ? 'rgba(217, 119, 6, 0.18)'
-                    : 'rgba(61, 107, 53, 0.12)',
+                    ? 'rgba(191, 152, 97, 0.18)'
+                    : 'rgba(2, 51, 45, 0.12)',
                 },
               ]}
             >
@@ -339,7 +348,7 @@ export default function ProfileScreen() {
               label={isPro ? 'Manage Membership' : 'Upgrade to Nourish+ Pro'}
               onPress={() => setShowPaywall(true)}
               icon={
-                <Sparkles
+                <Crown
                   size={16}
                   color={palette.chalk}
                   strokeWidth={2.5}
@@ -357,6 +366,48 @@ export default function ProfileScreen() {
               onPress={handleRestorePurchases}
               size="sm"
               style={{ minWidth: 84 }}
+            />
+          </View>
+        </SurfaceCard>
+
+        {/* ── Demo Pro Mode Toggle ─────────────────────────────────────────────
+            For testing the Pro experience without a real purchase.
+            This flips only the local AsyncStorage flag — not a real subscription.
+        ──────────────────────────────────────────────────────────────────────── */}
+        <SurfaceCard style={[styles.sectionCard, { borderColor: isPro ? palette.saffron : colors.border, borderWidth: isPro ? 1.5 : 1 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: spacing[3] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Text style={[styles.sectionHeading, { color: colors.text, marginBottom: 0 }]}>
+                  Demo Pro Mode
+                </Text>
+                <View style={{
+                  backgroundColor: 'rgba(191, 152, 97, 0.15)',
+                  borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+                }}>
+                  <Text style={{ fontSize: 9, fontFamily: font.sansBold, color: palette.saffron, letterSpacing: 0.8 }}>
+                    DEMO ONLY
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.sectionSub, { color: colors.subText }]}>
+                {isPro
+                  ? 'Pro features unlocked for testing. AI Chef, unlimited scans, and advanced analytics are active.'
+                  : 'Toggle to simulate the Pro experience locally. Flip off to return to free tier.'}
+              </Text>
+            </View>
+            <Switch
+              value={isPro}
+              onValueChange={(val) => {
+                hapticTap();
+                setIsPro(val);
+                toast.show(
+                  val ? '✨ Pro mode enabled (demo)' : 'Returned to free tier',
+                  val ? 'success' : 'info',
+                );
+              }}
+              thumbColor={isPro ? palette.chalk : colors.border}
+              trackColor={{ false: colors.border, true: palette.forestDeep }}
             />
           </View>
         </SurfaceCard>
@@ -379,8 +430,6 @@ export default function ProfileScreen() {
             ]}
             value={form.name}
             onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
-            placeholder="Your name"
-            placeholderTextColor={colors.subText}
           />
 
           {/* Age / Weight / Height */}
@@ -436,14 +485,15 @@ export default function ProfileScreen() {
                 <PressableScale
                   key={s}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticSelection();
                     setForm((f) => ({ ...f, sex: s }));
                   }}
                   style={[
                     styles.sexChip,
                     {
-                      backgroundColor: active ? palette.forestDeep : colors.bg,
-                      borderColor: active ? palette.forestDeep : colors.border,
+                      backgroundColor: active ? '#02332D' : (mode === 'dark' ? '#0E201D' : colors.bg),
+                      borderColor: active ? '#BF9861' : colors.border,
+                      borderWidth: active ? 1.5 : 1,
                     },
                   ]}
                   accessibilityLabel={`Select sex ${s}`}
@@ -451,7 +501,10 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.sexText,
-                      { color: active ? palette.chalk : colors.text },
+                      {
+                        color: active ? '#DACFBD' : colors.text,
+                        fontFamily: active ? font.sansBold : font.sansMed,
+                      },
                     ]}
                   >
                     {s === 'female' ? 'Female' : 'Male'}
@@ -478,7 +531,7 @@ export default function ProfileScreen() {
                 <PressableScale
                   key={item.value}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticSelection();
                     setForm((f) => ({ ...f, activity_level: item.value }));
                   }}
                   style={[
@@ -486,11 +539,11 @@ export default function ProfileScreen() {
                     {
                       backgroundColor: isSelected
                         ? mode === 'dark'
-                          ? 'rgba(61, 107, 53, 0.2)'
-                          : 'rgba(61, 107, 53, 0.08)'
+                          ? 'rgba(2, 51, 45, 0.25)'
+                          : 'rgba(2, 51, 45, 0.08)'
                         : colors.bg,
                       borderColor: isSelected ? palette.forestDeep : colors.border,
-                      borderWidth: isSelected ? 1.5 : 1,
+                      borderWidth: 1,
                     },
                   ]}
                   accessibilityLabel={`Select activity ${item.label}`}
@@ -604,7 +657,7 @@ export default function ProfileScreen() {
                 <PressableScale
                   key={sizeNum}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticSelection();
                     setHouseholdSize(sizeNum);
                   }}
                   style={[
@@ -633,7 +686,7 @@ export default function ProfileScreen() {
         <SurfaceCard style={styles.sectionCard}>
           <PressableScale
             onPress={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setGoalsExpanded((x) => !x);
             }}
             style={styles.expandHeaderPressable}
@@ -705,8 +758,8 @@ export default function ProfileScreen() {
                   {
                     backgroundColor:
                       rda.sodium <= 1500
-                        ? 'rgba(61, 107, 53, 0.08)'
-                        : 'rgba(217, 119, 6, 0.08)',
+                        ? 'rgba(2, 51, 45, 0.08)'
+                        : 'rgba(191, 152, 97, 0.1)',
                     borderColor: rda.sodium <= 1500 ? palette.forestDeep : palette.saffron,
                   },
                 ]}
@@ -771,6 +824,28 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              onPress={() => setShowTerms(true)}
+              style={[styles.accountActionBtn, { borderColor: colors.border }]}
+              activeOpacity={0.7}
+            >
+              <FileText size={18} color={colors.text} strokeWidth={2} />
+              <Text style={[styles.accountActionText, { color: colors.text }]}>
+                Terms of Service
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowPrivacy(true)}
+              style={[styles.accountActionBtn, { borderColor: colors.border }]}
+              activeOpacity={0.7}
+            >
+              <Shield size={18} color={colors.text} strokeWidth={2} />
+              <Text style={[styles.accountActionText, { color: colors.text }]}>
+                Privacy Policy &amp; Security Guarantee
+              </Text>
+            </TouchableOpacity>
+
             {currentUser ? (
               <TouchableOpacity
                 onPress={handleLogout}
@@ -785,7 +860,7 @@ export default function ProfileScreen() {
             ) : (
               <TouchableOpacity
                 onPress={() => router.push('/login')}
-                style={[styles.accountActionBtn, { borderColor: palette.forestDeep, backgroundColor: 'rgba(61, 107, 53, 0.08)' }]}
+                style={[styles.accountActionBtn, { borderColor: palette.forestDeep, backgroundColor: 'rgba(2, 51, 45, 0.08)' }]}
                 activeOpacity={0.7}
               >
                 <User size={18} color={palette.forestDeep} strokeWidth={2} />
@@ -799,7 +874,7 @@ export default function ProfileScreen() {
               onPress={handleDeleteAccount}
               style={[
                 styles.accountActionBtn,
-                { borderColor: palette.burgundy, backgroundColor: 'rgba(153, 27, 27, 0.04)' },
+                { borderColor: palette.burgundy, backgroundColor: 'rgba(127, 17, 0, 0.06)' },
               ]}
               activeOpacity={0.7}
             >
@@ -811,6 +886,78 @@ export default function ProfileScreen() {
           </View>
         </SurfaceCard>
       </ScrollView>
+
+      {/* Terms of Service Modal */}
+      <Modal
+        visible={showTerms}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTerms(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[modalStyles.head, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <FileText size={20} color={palette.royalGreen} />
+                <Text style={[modalStyles.title, { color: colors.text }]}>Terms of Service</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowTerms(false)} style={modalStyles.closeBtn}>
+                <X size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ marginVertical: 16 }} showsVerticalScrollIndicator={false}>
+              <Text style={[modalStyles.p, { color: colors.text }]}>
+                1. Acceptance of Terms: By accessing Nourish, you agree to comply with all governing service guidelines.
+              </Text>
+              <Text style={[modalStyles.p, { color: colors.text }]}>
+                2. Health Disclaimer: Nutritional estimations and recommendations are intended solely for lifestyle optimization and do not substitute professional medical care.
+              </Text>
+              <Text style={[modalStyles.p, { color: colors.text }]}>
+                3. Data Stewardship: You maintain full sovereignty over your grocery logs and biometric inputs.
+              </Text>
+            </ScrollView>
+            <TouchableOpacity onPress={() => setShowTerms(false)} style={[modalStyles.doneBtn, { backgroundColor: palette.royalGreen }]}>
+              <Text style={[modalStyles.doneBtnText, { color: palette.chalk }]}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Privacy Policy Modal */}
+      <Modal
+        visible={showPrivacy}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPrivacy(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[modalStyles.head, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Shield size={20} color={palette.royalGreen} />
+                <Text style={[modalStyles.title, { color: colors.text }]}>Privacy Policy</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPrivacy(false)} style={modalStyles.closeBtn}>
+                <X size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ marginVertical: 16 }} showsVerticalScrollIndicator={false}>
+              <Text style={[modalStyles.p, { color: colors.text }]}>
+                1. Zero Tracking: Nourish does not sell or share personal health metrics with external advertisers or data brokers.
+              </Text>
+              <Text style={[modalStyles.p, { color: colors.text }]}>
+                2. Row Level Isolation: Multi-tenant database entries are protected by cryptographically isolated Row Level Security.
+              </Text>
+              <Text style={[modalStyles.p, { color: colors.text }]}>
+                3. Total Erasure: Executing Delete Account permanently purges all remote database records and local storage keys.
+              </Text>
+            </ScrollView>
+            <TouchableOpacity onPress={() => setShowPrivacy(false)} style={[modalStyles.doneBtn, { backgroundColor: palette.royalGreen }]}>
+              <Text style={[modalStyles.doneBtnText, { color: palette.chalk }]}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Paywall Modal */}
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
@@ -1098,6 +1245,62 @@ const styles = StyleSheet.create({
   },
   accountActionText: {
     fontSize: 14,
+    fontFamily: font.sansBold,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(2, 51, 45, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '80%',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    shadowColor: '#02332D',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  head: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontFamily: font.sansBold,
+  },
+  closeBtn: {
+    padding: 6,
+    borderRadius: 8,
+  },
+  p: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontFamily: font.sans,
+    marginBottom: 12,
+  },
+  doneBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  doneBtnText: {
+    fontSize: 13,
+    letterSpacing: 1.2,
     fontFamily: font.sansBold,
   },
 });

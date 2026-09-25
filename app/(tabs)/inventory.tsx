@@ -7,11 +7,11 @@ import {
   Plus, AlertTriangle, X, Check, Trash2, Filter,
   ChefHat, Info, ShoppingBag, Snowflake, HeartHandshake,
   Search, Undo2, ArrowRight, Boxes, CheckCircle2,
-  Sparkles, ChevronRight, BookOpen,
+  ChevronRight, BookOpen,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { hapticSuccess, hapticSelection, hapticWarning } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import {
   useTheme, SurfaceCard, MetricCard, StatusBadge,
@@ -25,6 +25,7 @@ import { InventoryRow, FoodCategory } from '@/lib/types';
 import { FOOD_CATALOG, CATEGORY_LABELS, FOOD_BY_NAME } from '@/lib/foodCatalog';
 import { getStorageTip, xpForConsumed } from '@/lib/features';
 import { ShoppingView } from './shopping';
+import { PantryItemCard } from '@/components/inventory/PantryItemCard';
 
 function daysLeft(expires_at: string | null): number {
   if (!expires_at) return 999;
@@ -83,8 +84,8 @@ export default function InventoryScreen() {
   const urgentTotal = items.filter((i) => daysLeft(i.expires_at) <= 3).length;
 
   // Actions
-  const handleConsume = async (item: InventoryRow) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleConsume = useCallback(async (item: InventoryRow) => {
+    hapticSuccess();
     lastActionItem.current = { item, action: 'consumed' };
     const food = FOOD_BY_NAME[item.name.toLowerCase()];
     const co2 = (food?.co2ePerKg ?? 1) * 0.15;
@@ -92,10 +93,10 @@ export default function InventoryScreen() {
     await addXp(xpForConsumed(co2));
     await remove(item.id);
     toast.show(`Eaten: ${item.name} (+${xpForConsumed(co2)} XP)`, 'success');
-  };
+  }, [logEvent, addXp, remove, toast]);
 
-  const handleFreeze = async (item: InventoryRow) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleFreeze = useCallback(async (item: InventoryRow) => {
+    hapticSuccess();
     const newExpiry = new Date(Date.now() + 90 * 86400000).toISOString();
     await remove(item.id);
     await add({
@@ -107,10 +108,10 @@ export default function InventoryScreen() {
     });
     await addXp(15);
     toast.show(`Frozen: ${item.name} (+90 days preservation)`, 'success');
-  };
+  }, [remove, add, addXp, toast]);
 
-  const handleDonate = async (item: InventoryRow) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleDonate = useCallback(async (item: InventoryRow) => {
+    hapticSuccess();
     lastActionItem.current = { item, action: 'donated' };
     const food = FOOD_BY_NAME[item.name.toLowerCase()];
     const co2 = (food?.co2ePerKg ?? 1) * 0.25;
@@ -118,10 +119,10 @@ export default function InventoryScreen() {
     await addXp(25);
     await remove(item.id);
     toast.show(`Donated: ${item.name} (+25 XP)`, 'success');
-  };
+  }, [logEvent, addXp, remove, toast]);
 
-  const handleDiscard = async (item: InventoryRow) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  const handleDiscard = useCallback(async (item: InventoryRow) => {
+    hapticWarning();
     lastActionItem.current = { item, action: 'discarded' };
     const food = FOOD_BY_NAME[item.name.toLowerCase()];
     const co2 = (food?.co2ePerKg ?? 1) * 0.15;
@@ -129,7 +130,7 @@ export default function InventoryScreen() {
     await logEvent('item_discarded', co2, { name: item.name });
     await remove(item.id);
     toast.show(`Discarded: ${item.name}`, 'error');
-  };
+  }, [logDisposal, logEvent, remove, toast]);
 
   const handleUndo = async () => {
     if (!lastActionItem.current) return;
@@ -185,7 +186,7 @@ export default function InventoryScreen() {
         <View style={[styles.segmentTrack, { backgroundColor: colors.paperBg, borderColor: colors.border }]}>
           <TouchableOpacity
             style={[styles.segmentTab, activeSegment === 'pantry' && { backgroundColor: palette.sageDeep }]}
-            onPress={() => { Haptics.selectionAsync(); setActiveSegment('pantry'); }}
+            onPress={() => { hapticSelection(); setActiveSegment('pantry'); }}
             accessibilityRole="tab"
             accessibilityLabel="Pantry Inventory tab"
             accessibilityState={{ selected: activeSegment === 'pantry' }}
@@ -203,7 +204,7 @@ export default function InventoryScreen() {
 
           <TouchableOpacity
             style={[styles.segmentTab, activeSegment === 'grocery' && { backgroundColor: palette.sageDeep }]}
-            onPress={() => { Haptics.selectionAsync(); setActiveSegment('grocery'); }}
+            onPress={() => { hapticSelection(); setActiveSegment('grocery'); }}
             accessibilityRole="tab"
             accessibilityLabel="Smart Grocery List tab"
             accessibilityState={{ selected: activeSegment === 'grocery' }}
@@ -290,7 +291,7 @@ export default function InventoryScreen() {
                       borderColor: isSelected ? palette.sageDeep : colors.border,
                     },
                   ]}
-                  onPress={() => { Haptics.selectionAsync(); setSelectedCategory(cat); }}
+                  onPress={() => { hapticSelection(); setSelectedCategory(cat); }}
                   accessibilityRole="button"
                   accessibilityLabel={`Filter by ${cat}`}
                 >
@@ -343,7 +344,7 @@ export default function InventoryScreen() {
               <View style={styles.sectionHeader}>
                 <View style={[styles.sectionBullet, { backgroundColor: palette.amberDeep }]} />
                 <Text style={[type.h2, { color: colors.text }]}>Use This Week</Text>
-                <View style={[styles.sectionCountBadge, { backgroundColor: '#FEF3C7' }]}>
+                <View style={[styles.sectionCountBadge, { backgroundColor: palette.goldMist }]}>
                   <Text style={[type.monoBold, { color: palette.amberDeep, fontSize: 10 }]}>{weekItems.length}</Text>
                 </View>
               </View>
@@ -455,7 +456,7 @@ export default function InventoryScreen() {
               <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>FOOD NAME</Text>
               <TextInput
                 style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                placeholder="e.g. Organic Baby Spinach"
+                placeholder="Enter food name"
                 placeholderTextColor={colors.subText}
                 value={newItemName}
                 onChangeText={setNewItemName}
@@ -498,117 +499,6 @@ export default function InventoryScreen() {
 // PANTRY ITEM CARD COMPONENT
 // ─────────────────────────────────────────────────────────────────
 
-interface PantryItemCardProps {
-  item: InventoryRow;
-  onConsume: () => void;
-  onFreeze: () => void;
-  onDonate: () => void;
-  onDiscard: () => void;
-  onTip: () => void;
-  onRescue: () => void;
-}
-
-function PantryItemCard({
-  item,
-  onConsume,
-  onFreeze,
-  onDonate,
-  onDiscard,
-  onTip,
-  onRescue,
-}: PantryItemCardProps) {
-  const { colors } = useTheme();
-  const days = daysLeft(item.expires_at);
-
-  return (
-    <SurfaceCard style={styles.itemCard} variant="elevated">
-      <View style={styles.itemMainRow}>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <FreshnessBadge daysLeft={days} />
-            <Text style={[type.monoBold, { color: colors.subText, fontSize: 11, textTransform: 'capitalize' }]}>
-              {item.category.replace('_', ' ')}
-            </Text>
-          </View>
-          <Text style={[type.h3, { color: colors.text, fontFamily: font.sansBold, fontSize: 16 }]}>
-            {item.name}
-          </Text>
-          <Text style={[type.bodySm, { color: colors.subText, marginTop: 2 }]}>
-            {item.quantity ? `${item.quantity} ${item.unit || ''}` : '1 package'}
-          </Text>
-        </View>
-
-        {/* Tip & Rescue CTAs */}
-        <View style={{ alignItems: 'flex-end', gap: 6 }}>
-          <TouchableOpacity
-            onPress={onTip}
-            style={[styles.tipBtn, { backgroundColor: colors.paperBg, borderColor: colors.border }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Storage tips for ${item.name}`}
-          >
-            <Info size={14} color={palette.sageDeep} />
-            <Text style={[type.monoBold, { color: palette.sageDeep, fontSize: 10, marginLeft: 4 }]}>TIPS</Text>
-          </TouchableOpacity>
-
-          {days <= 3 && (
-            <TouchableOpacity
-              onPress={onRescue}
-              style={[styles.rescuePill, { backgroundColor: '#FEF3C7' }]}
-              accessibilityRole="button"
-              accessibilityLabel={`Find rescue recipes for ${item.name}`}
-            >
-              <ChefHat size={12} color={palette.amberDeep} />
-              <Text style={[type.monoBold, { color: palette.amberDeep, fontSize: 10, marginLeft: 4 }]}>RESCUE</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* 4 Action Buttons Row: Consumed, Freeze, Donate, Discard */}
-      <View style={[styles.actionRow, { borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={onConsume}
-          accessibilityRole="button"
-          accessibilityLabel={`Mark ${item.name} as consumed`}
-        >
-          <Check size={16} color={palette.sageDeep} strokeWidth={2.4} />
-          <Text style={[styles.actionBtnText, { color: palette.sageDeep }]}>Eaten</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={onFreeze}
-          accessibilityRole="button"
-          accessibilityLabel={`Freeze ${item.name}`}
-        >
-          <Snowflake size={15} color="#0284C7" strokeWidth={2.2} />
-          <Text style={[styles.actionBtnText, { color: '#0284C7' }]}>Freeze</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={onDonate}
-          accessibilityRole="button"
-          accessibilityLabel={`Donate ${item.name}`}
-        >
-          <HeartHandshake size={15} color={palette.amberDeep} strokeWidth={2.2} />
-          <Text style={[styles.actionBtnText, { color: palette.amberDeep }]}>Donate</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={onDiscard}
-          accessibilityRole="button"
-          accessibilityLabel={`Discard ${item.name}`}
-        >
-          <Trash2 size={15} color={palette.crimson} strokeWidth={2.2} />
-          <Text style={[styles.actionBtnText, { color: palette.crimson }]}>Discard</Text>
-        </TouchableOpacity>
-      </View>
-    </SurfaceCard>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {

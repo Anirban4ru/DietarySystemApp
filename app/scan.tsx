@@ -7,9 +7,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
   ScanLine, Check, Zap, Sun, Moon, ChevronDown, ChevronUp,
   Barcode, Wand2, X, RefreshCw, AlertCircle, Plus, Minus,
-  Camera, ShoppingBag, Sparkles, CheckCircle2,
+  Camera, ShoppingBag, CheckCircle2,
 } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticWarning, hapticError, hapticSelection } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { palette, type, spacing, border, font } from '@/lib/theme';
@@ -20,7 +20,7 @@ import {
 import { PressableScale } from '@/components/motion';
 import { FOOD_CATALOG } from '@/lib/foodCatalog';
 import { useInventory, useXp, usePro } from '@/lib/hooks';
-import { parseReceipt } from '@/lib/ai';
+import { parseReceipt, detectFoodItem } from '@/lib/ai';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -69,7 +69,7 @@ export default function ScannerScreen() {
   }, [reticleAnim]);
 
   const handleBack = () => {
-    Haptics.selectionAsync();
+    hapticSelection();
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -85,7 +85,7 @@ export default function ScannerScreen() {
   }, [permission]);
 
   const runDemoScan = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     setScanning(true);
     setScanError(null);
     setScanProgressText('Classifying ingredients with Gemini Vision...');
@@ -98,7 +98,7 @@ export default function ScannerScreen() {
           { name: 'Sourdough Artisan Bread', quantity: 1 },
         ]);
         setScanProgressText('Parsed 4 grocery items');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        hapticSuccess();
       } else {
         const samples = [
           { name: 'Avocado', days: 4, fresh: 0.88, conf: 0.95 },
@@ -114,7 +114,7 @@ export default function ScannerScreen() {
         setDetectedQuantity(1);
         setItemResultReady(true);
         setScanProgressText(`Identified: ${pick.name}`);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        hapticSuccess();
       }
       setScanning(false);
     }, 900);
@@ -152,13 +152,13 @@ export default function ScannerScreen() {
     if (!isPro) {
       const allowed = await consumeScan();
       if (!allowed) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        hapticWarning();
         openPaywallFor('unlimited_scans');
         return;
       }
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     setScanning(true);
     setScanError(null);
     setScanProgressText('Capturing visual frame...');
@@ -185,58 +185,34 @@ export default function ScannerScreen() {
         if (result.items && result.items.length > 0) {
           setReceiptItems(result.items);
           setScanProgressText(`Found ${result.items.length} grocery items`);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          hapticSuccess();
         } else {
           throw new Error('No grocery food items recognized on this receipt.');
         }
       } else {
         setScanProgressText('Classifying ingredients with Gemini Vision...');
-        const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-        if (!apiKey) {
-          // If no key configured, fallback to demo scan gracefully
+        try {
+          const result = await detectFoodItem(photoBase64);
+          const foodName = FOOD_CATALOG.find((f) => f.name.toLowerCase() === result.name?.toLowerCase())?.name || result.name || 'Fresh Ingredient';
+
+          setDetectedName(foodName);
+          setDetectedConfidence(result.confidence || 0.92);
+          setDetectedFreshness(result.freshness || 0.85);
+          setDetectedDays(Math.max(1, Math.round((result.freshness || 0.85) * 10)));
+          setDetectedQuantity(1);
+          setItemResultReady(true);
+          setScanProgressText(`Identified: ${foodName}`);
+          hapticSuccess();
+        } catch (err: any) {
+          console.warn('Food detection error, running demo fallback:', err);
           runDemoScan();
           return;
         }
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: 'Identify the raw food ingredient. Estimate freshness 0.0 to 1.0 and shelf life in days. Return JSON only: {"name": "Avocado", "freshness": 0.9, "confidence": 0.95, "shelfDays": 5}' },
-                  { inline_data: { mime_type: 'image/jpeg', data: photoBase64 } }
-                ]
-              }],
-              generationConfig: { responseMimeType: 'application/json' }
-            })
-          }
-        );
-
-        const data = await response.json();
-        if (!data.candidates) {
-          throw new Error(data.error?.message || 'Failed to classify food item.');
-        }
-
-        const cleanJson = data.candidates[0].content.parts[0].text.replace(/```json|```/gi, '').trim();
-        const result = JSON.parse(cleanJson);
-        const foodName = FOOD_CATALOG.find((f) => f.name.toLowerCase() === result.name?.toLowerCase())?.name || result.name || 'Fresh Ingredient';
-
-        setDetectedName(foodName);
-        setDetectedConfidence(result.confidence || 0.92);
-        setDetectedFreshness(result.freshness || 0.85);
-        setDetectedDays(result.shelfDays || 7);
-        setDetectedQuantity(1);
-        setItemResultReady(true);
-        setScanProgressText(`Identified: ${foodName}`);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (e: any) {
       console.warn('Scan failed:', e);
       setScanError(e.message || 'Scan analysis timed out. Please try again.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hapticError();
     } finally {
       setScanning(false);
     }
@@ -245,7 +221,7 @@ export default function ScannerScreen() {
   // Barcode Auto-detection
   const handleBarcodeScanned = (barcodeData: string) => {
     if (scanning || itemResultReady || receiptItems) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     setDetectedName(`Scanned Product (${barcodeData.slice(0, 10)})`);
     setDetectedConfidence(1.0);
     setDetectedFreshness(0.95);
@@ -257,7 +233,7 @@ export default function ScannerScreen() {
   // Save Single Item
   const handleSaveItem = async () => {
     if (!detectedName.trim()) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     await add({
       name: detectedName.trim(),
       quantity: detectedQuantity,
@@ -274,7 +250,7 @@ export default function ScannerScreen() {
   // Batch Save Receipt Items
   const handleSaveReceipt = async () => {
     if (!receiptItems || receiptItems.length === 0) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     for (const r of receiptItems) {
       await add({
         name: r.name,
@@ -291,7 +267,7 @@ export default function ScannerScreen() {
   // Receipt Item Quantity Adjuster
   const updateReceiptQty = (index: number, delta: number) => {
     if (!receiptItems) return;
-    Haptics.selectionAsync();
+    hapticSelection();
     const updated = [...receiptItems];
     const newQty = Math.max(1, updated[index].quantity + delta);
     updated[index].quantity = newQty;
@@ -300,13 +276,13 @@ export default function ScannerScreen() {
 
   const removeReceiptItem = (index: number) => {
     if (!receiptItems) return;
-    Haptics.selectionAsync();
+    hapticSelection();
     const updated = receiptItems.filter((_, i) => i !== index);
     setReceiptItems(updated.length > 0 ? updated : null);
   };
 
   const resetScan = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticTap();
     setItemResultReady(false);
     setReceiptItems(null);
     setScanError(null);
@@ -347,7 +323,7 @@ export default function ScannerScreen() {
 
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => { Haptics.selectionAsync(); toggle(); }}
+            onPress={() => { hapticSelection(); toggle(); }}
             accessibilityRole="button"
             accessibilityLabel="Toggle light/dark theme"
           >
@@ -515,7 +491,7 @@ export default function ScannerScreen() {
             <View style={[styles.modeSelectorTrack, { backgroundColor: colors.paperBg, borderColor: colors.border }]}>
               <TouchableOpacity
                 style={[styles.modeTab, scanMode === 'item' && { backgroundColor: palette.sageDeep }]}
-                onPress={() => { Haptics.selectionAsync(); setScanMode('item'); }}
+                onPress={() => { hapticSelection(); setScanMode('item'); }}
                 accessibilityRole="button"
                 accessibilityLabel="Food item visual scanner"
               >
@@ -527,7 +503,7 @@ export default function ScannerScreen() {
 
               <TouchableOpacity
                 style={[styles.modeTab, scanMode === 'receipt' && { backgroundColor: palette.sageDeep }]}
-                onPress={() => { Haptics.selectionAsync(); setScanMode('receipt'); }}
+                onPress={() => { hapticSelection(); setScanMode('receipt'); }}
                 accessibilityRole="button"
                 accessibilityLabel="Receipt digitizer"
               >
@@ -539,7 +515,7 @@ export default function ScannerScreen() {
 
               <TouchableOpacity
                 style={[styles.modeTab, scanMode === 'barcode' && { backgroundColor: palette.sageDeep }]}
-                onPress={() => { Haptics.selectionAsync(); setScanMode('barcode'); }}
+                onPress={() => { hapticSelection(); setScanMode('barcode'); }}
                 accessibilityRole="button"
                 accessibilityLabel="Barcode scanner"
               >

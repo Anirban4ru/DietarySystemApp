@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Switch, Platform } from 'react-native';
-import { Bell, Clock, AlertCircle, Sparkles, ShoppingBag, ShieldCheck } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { Bell, Clock, AlertCircle, ChefHat, ShoppingBag, ShieldCheck } from 'lucide-react-native';
+import { hapticSelection, hapticTap } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import { useTheme, SurfaceCard, PrimaryAction } from './ui';
 import {
@@ -28,13 +28,13 @@ export function NotificationPreferencesCard() {
   }, []);
 
   const handleToggle = async (key: keyof NotificationPreferences, value: boolean) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     const updated = await saveNotificationPreferences({ [key]: value });
     setPrefs(updated);
   };
 
   const handleEnablePermission = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     const granted = await requestNotificationPermissions();
     setPermissionGranted(granted);
   };
@@ -50,7 +50,7 @@ export function NotificationPreferencesCard() {
       key: 'dailyRescue',
       title: 'Daily Rescue Suggestions',
       desc: 'Dinner ideas using ingredients in your fridge (5:15 PM)',
-      icon: Sparkles,
+      icon: ChefHat,
     },
     {
       key: 'mealPrep',

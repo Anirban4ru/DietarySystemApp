@@ -1,16 +1,16 @@
+import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { MealPlanView } from './plan';
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Animated, Easing,
+  Modal, Animated, Easing, InteractionManager,
 } from 'react-native';
 import {
   Leaf, Check, AlertCircle, ChefHat, Heart,
-  ShoppingCart, X, Sparkles, Star, Dice5, Calendar,
+  ShoppingCart, X, Star, Dice5, Calendar,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { useFocusEffect } from 'expo-router';
+import { hapticSuccess, hapticSelection } from '@/lib/haptics';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { palette, type, spacing, font, border } from '@/lib/theme';
 import {
   Label, Pill, Divider, BrutalButton, BrutalPanel,
@@ -24,12 +24,15 @@ import { co2eAvoidedForMeal } from '@/lib/impact';
 import { xpForMeal, getPairings } from '@/lib/features';
 import { generateStrictRecipe } from '@/lib/ai';
 import { getVaultRecipes, saveRecipeToVault, removeRecipeFromVault } from '@/lib/vault';
+import { RecipeCard } from '@/components/recipes/RecipeCard';
+import { RecipeDetail } from '@/components/recipes/RecipeDetail';
 
 export default function RecipesScreen() {
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const toast = useToast();
-  const { items } = useInventory();
+  const { items, loading: invLoading } = useInventory();
   const { profile } = useProfile();
   const { logEvent } = useImpact();
   const { favs, toggle: toggleFav } = useFavorites();
@@ -66,22 +69,33 @@ export default function RecipesScreen() {
     return m;
   }, [items]);
 
-  const recipes = useMemo(
-    () => optimizeRecipes(inventoryMap, rda, profile?.conditions ?? [], weights),
-    [inventoryMap, rda, profile, weights],
-  );
+  const [recipes, setRecipes] = useState<RecipeCandidate[]>([]);
 
-  const cook = async (c: RecipeCandidate) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  useEffect(() => {
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!cancelled) {
+        const computed = optimizeRecipes(inventoryMap, rda, profile?.conditions ?? [], weights);
+        setRecipes(computed);
+      }
+    });
+    return () => {
+      cancelled = true;
+      task.cancel();
+    };
+  }, [inventoryMap, rda, profile?.conditions, weights]);
+
+  const cook = useCallback(async (c: RecipeCandidate) => {
+    hapticSuccess();
     const avoided = co2eAvoidedForMeal(c.co2eKg);
     await logEvent('rescue_meal', avoided, { recipe: c.name });
     await addXp(xpForMeal(avoided));
     setSelected(c.name);
     toast.show(`${c.name} cooked! Logged +XP`, 'success');
     setTimeout(() => setSelected(null), 3000);
-  };
+  }, [logEvent, addXp, toast]);
 
-  const addToShopping = async (c: RecipeCandidate) => {
+  const addToShopping = useCallback(async (c: RecipeCandidate) => {
     if (c.missing.length === 0) {
       toast.show('All ingredients already in pantry!', 'info');
       return;
@@ -91,9 +105,19 @@ export default function RecipesScreen() {
       return { item_name: name, category: food?.category ?? 'other', quantity: 1 };
     });
     await addShopping(missing);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     toast.show(`${c.missing.length} item${c.missing.length > 1 ? 's' : ''} added to shopping list`, 'success');
-  };
+  }, [addShopping, toast]);
+
+  const handleFav = useCallback((name: string) => {
+    toggleFav(name);
+    hapticSelection();
+  }, [toggleFav]);
+
+  const handleDetail = useCallback((c: RecipeCandidate) => {
+    hapticSelection();
+    setDetail(c);
+  }, []);
 
   const handleStrictAI = async () => {
     if (items.length === 0) return;
@@ -157,7 +181,7 @@ export default function RecipesScreen() {
             styles.segmentBtn,
             mainTab === 'recipes' && { backgroundColor: palette.forestDeep }
           ]}
-          onPress={() => { Haptics.selectionAsync(); setMainTab('recipes'); }}
+          onPress={() => { hapticSelection(); setMainTab('recipes'); }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <ChefHat size={16} color={mainTab === 'recipes' ? palette.chalk : colors.subText} strokeWidth={2.5} />
@@ -173,7 +197,7 @@ export default function RecipesScreen() {
             styles.segmentBtn,
             mainTab === 'plan' && { backgroundColor: palette.forestDeep }
           ]}
-          onPress={() => { Haptics.selectionAsync(); setMainTab('plan'); }}
+          onPress={() => { hapticSelection(); setMainTab('plan'); }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Calendar size={16} color={mainTab === 'plan' ? palette.chalk : colors.subText} strokeWidth={2.5} />
@@ -231,9 +255,9 @@ export default function RecipesScreen() {
                 opacity: items.length === 0 ? 0.5 : 1,
               },
             ]}>
-              {aiLoading ? <Loader /> : <Sparkles size={15} color={palette.chalk} strokeWidth={2.5} />}
+              {aiLoading ? <Loader /> : <ChefHat size={15} color={palette.chalk} strokeWidth={2.2} />}
               <Text style={[styles.aiBtnText, { color: palette.chalk, fontSize: 12 }]}>
-                {aiLoading ? 'Gen...' : 'Strict AI'}
+                {aiLoading ? 'Synthesizing...' : 'Pantry AI'}
               </Text>
             </View>
           </PressScale>
@@ -256,12 +280,23 @@ export default function RecipesScreen() {
       </View>
       )}
 
+      {/* Loading skeleton */}
+      {viewMode === 'pantry' && invLoading && (
+        <View style={{ gap: spacing[3], marginTop: 12 }}>
+          <SkeletonCard height={140} />
+          <SkeletonCard height={140} />
+          <SkeletonCard height={140} />
+        </View>
+      )}
+
       {/* Empty pantry state */}
-      {viewMode === 'pantry' && items.length === 0 && (
+      {viewMode === 'pantry' && !invLoading && items.length === 0 && (
         <EmptyState 
           icon={ChefHat} 
-          title="Add food to your pantry first" 
-          message="Once you have items, recipes appear here automatically."
+          title="Add Food to Your Pantry" 
+          message="Once you add or scan ingredients, delicious personalized recipes appear here automatically."
+          actionLabel="Scan Groceries"
+          onAction={() => router.push('/scan')}
         />
       )}
 
@@ -269,8 +304,10 @@ export default function RecipesScreen() {
       {viewMode === 'vault' && vaultRecipes.length === 0 && (
         <EmptyState 
           icon={Star} 
-          title="Vault is empty" 
-          message="Save your favorite AI recipes here so you can cook them anytime."
+          title="Recipe Vault is Empty" 
+          message="Save your favorite generated and rescue recipes here so you can cook them anytime."
+          actionLabel="Discover Recipes"
+          onAction={() => setViewMode('pantry')}
         />
       )}
 
@@ -283,9 +320,9 @@ export default function RecipesScreen() {
           selected={selected === c.name}
           isFav={favs.includes(c.name)}
           onCook={() => cook(c)}
-          onFav={() => { toggleFav(c.name); Haptics.selectionAsync(); }}
+          onFav={() => handleFav(c.name)}
           onShop={() => addToShopping(c)}
-          onDetail={() => { Haptics.selectionAsync(); setDetail(c); }}
+          onDetail={() => handleDetail(c)}
           colors={colors}
           mode={mode}
         />
@@ -318,294 +355,7 @@ function SliderCtrl({ label, val, setVal, color, colors }: any) {
   );
 }
 
-// ─── Recipe Card ──────────────────────────────────────────────────
-function RecipeCard({ c, index, selected, isFav, onCook, onFav, onShop, onDetail, colors, mode }: {
-  c: RecipeCandidate; index: number; selected: boolean; isFav: boolean; mode: string;
-  onCook: () => void; onFav: () => void; onShop: () => void; onDetail: () => void; colors: any;
-}) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: index * 80, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 350, delay: index * 80, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  const missingCount = c.missing.length;
-  const isBestPick = index === 0;
-
-  return (
-    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: isBestPick ? palette.sageDeep : colors.border }]}>
-
-        {/* Best pick crown */}
-        {isBestPick && (
-          <View style={styles.bestPickBadge}>
-            <Star size={10} color={palette.chalk} fill={palette.chalk} strokeWidth={0} />
-            <Text style={styles.bestPickText}>BEST PICK</Text>
-          </View>
-        )}
-
-        {/* Card header */}
-        <View style={styles.cardHead}>
-          <PressScale onPress={onDetail} style={{ flex: 1 }}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{c.name}</Text>
-              <Text style={[styles.cardSub, { color: colors.subText }]}>
-                {c.ingredients.length} ingredients · {Math.round(c.nutrition.kcal)} kcal · {Math.round(c.nutrition.proteinG)}g P · {Math.round(c.nutrition.carbG)}g C
-              </Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={onFav}>
-            <View style={styles.favArea}>
-              <Heart
-                size={20}
-                color={isFav ? palette.crimson : colors.subText}
-                fill={isFav ? palette.crimson : 'none'}
-                strokeWidth={2}
-              />
-            </View>
-          </PressScale>
-        </View>
-
-        {/* Score bars */}
-        <View style={styles.scoreGrid}>
-          <ScoreBar label="Waste rescue" value={c.wasteScore} color={palette.danger} colors={colors} />
-          <ScoreBar label="Nutrition fit" value={c.rdaScore} color={palette.sageDeep} colors={colors} />
-          <ScoreBar label="In stock" value={c.completeness} color={palette.amberDeep} colors={colors} />
-        </View>
-
-        {/* Missing notice */}
-        {missingCount > 0 && (
-          <View style={[styles.noticeBox, { backgroundColor: '#FFF8EC', borderColor: palette.amberDeep }]}>
-            <AlertCircle size={13} color={palette.amberDeep} strokeWidth={2.5} />
-            <Text style={[styles.noticeText, { color: palette.ink }]}>
-              {missingCount} missing — tap SHOP to add to list
-            </Text>
-          </View>
-        )}
-
-        {/* CO2 line */}
-        <View style={styles.co2Row}>
-          <Leaf size={13} color={palette.sageDeep} strokeWidth={2.5} />
-          <Text style={[styles.co2Text, { color: colors.subText }]}>
-            Saves <Text style={{ color: palette.sageDeep, fontFamily: font.sansBold }}>{co2eAvoidedForMeal(c.co2eKg)} kg</Text> CO2
-          </Text>
-        </View>
-
-        {/* Action buttons */}
-        <View style={styles.btnRow}>
-          <PressScale
-            onPress={onCook}
-            style={[styles.actionBtnWrap, { flex: 1 }] as any}
-          >
-            <View style={[
-              styles.actionBtn,
-              { backgroundColor: selected ? palette.sageDeep : palette.ink }
-            ]}>
-              {selected
-                ? <Check size={15} color={palette.chalk} strokeWidth={2.8} />
-                : <ChefHat size={15} color={palette.chalk} strokeWidth={2.5} />}
-              <Text style={styles.actionBtnText}>
-                {selected ? 'COOKED' : 'COOK'}
-              </Text>
-            </View>
-          </PressScale>
-
-          <PressScale
-            onPress={onShop}
-            style={[styles.actionBtnWrap, { flex: 1, marginLeft: 8 }] as any}
-          >
-            <View style={[
-              styles.actionBtn,
-              {
-                backgroundColor: 'transparent',
-                borderWidth: 1.5,
-                borderColor: missingCount > 0 ? palette.sageDeep : colors.border,
-              },
-            ]}>
-              <ShoppingCart size={15} color={missingCount > 0 ? palette.sageDeep : colors.subText} strokeWidth={2.5} />
-              <Text style={[styles.actionBtnText, { color: missingCount > 0 ? palette.sageDeep : colors.subText }]}>
-                SHOP {missingCount > 0 ? `(${missingCount})` : ''}
-              </Text>
-            </View>
-          </PressScale>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ─── Score Bar ────────────────────────────────────────────────────
-function ScoreBar({ label, value, color, colors }: { label: string; value: number; color: string; colors: any }) {
-  const widthAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(widthAnim, {
-      toValue: Math.max(0, Math.min(1, value)),
-      duration: 600,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [value]);
-
-  const widthPct = widthAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-
-  return (
-    <View style={{ flex: 1 }}>
-      <Text style={[styles.scoreLabel, { color: colors.subText }]}>{label}</Text>
-      <View style={[styles.scoreTrack, { backgroundColor: colors.border }]}>
-        <Animated.View style={[styles.scoreFill, { width: widthPct, backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
-
-// ─── Recipe Detail Modal ──────────────────────────────────────────
-function RecipeDetail({ c, onClose, onCook, onShop, colors }: {
-  c: RecipeCandidate | null; onClose: () => void;
-  onCook: (c: RecipeCandidate) => void;
-  onShop: (c: RecipeCandidate) => void;
-  colors: any;
-}) {
-  const toast = useToast();
-  if (!c) return null;
-  const pairings = c.ingredients.length > 0 ? getPairings(c.ingredients[0].name) : [];
-
-  return (
-    <Modal visible={!!c} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { backgroundColor: colors.bg }]}>
-          <View style={styles.modalHandle} />
-
-          <View style={styles.modalHeader}>
-            <Text style={[type.h1, { color: colors.text, flex: 1, marginRight: 12 }]} numberOfLines={2}>{c.name}</Text>
-            <PressScale onPress={onClose}>
-              <View style={[styles.closeBtn, { borderColor: colors.border }]}>
-                <X size={18} color={colors.subText} strokeWidth={2.5} />
-              </View>
-            </PressScale>
-          </View>
-
-          <ScrollView style={{ flex: 1 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-            {/* Ingredients */}
-            <Label>INGREDIENTS</Label>
-            <View style={{ marginTop: spacing[2] }}>
-              {c.ingredients.map((ing) => {
-                const missing = c.missing.includes(ing.name);
-                const subbed = c.substitutions.find((s) => s.to === ing.name);
-                return (
-                  <View key={ing.name} style={[styles.ingRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.ingDot, { backgroundColor: missing ? palette.danger : palette.sageDeep }]} />
-                    <Text style={[styles.ingName, { color: missing ? palette.danger : colors.text }]}>
-                      {ing.name}
-                    </Text>
-                    <Text style={[styles.ingGrams, { color: colors.subText }]}>{ing.grams}g</Text>
-                    {missing && <Pill tone="danger">NEED</Pill>}
-                    {subbed && <Pill tone="warning">SWAPPED</Pill>}
-                  </View>
-                );
-              })}
-            </View>
-
-            {/* Instructions (if AI-generated) */}
-            {(c as any).instructions && (c as any).instructions.length > 0 && (
-              <View style={{ marginTop: spacing[4] }}>
-                <Label>HOW TO COOK</Label>
-                {(c as any).instructions.map((step: string, i: number) => (
-                  <View key={i} style={styles.stepRow}>
-                    <View style={[styles.stepNum, { backgroundColor: palette.ink }]}>
-                      <Text style={styles.stepNumText}>{i + 1}</Text>
-                    </View>
-                    <Text style={[styles.stepText, { color: colors.text }]}>{step}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <Divider color={colors.border} />
-
-            {/* Nutrition */}
-            <Label>NUTRITION</Label>
-            <View style={styles.nutriGrid}>
-              <NutriBox label="Calories" value={Math.round(c.nutrition.kcal)} colors={colors} />
-              <NutriBox label="Protein" value={`${Math.round(c.nutrition.proteinG)}g`} colors={colors} />
-              <NutriBox label="Carbs" value={`${Math.round(c.nutrition.carbG)}g`} colors={colors} />
-              <NutriBox label="Fat" value={`${Math.round(c.nutrition.fatG)}g`} colors={colors} />
-              <NutriBox label="Fiber" value={`${Math.round(c.nutrition.fiberG)}g`} colors={colors} />
-              <NutriBox label="Iron" value={`${Math.round(c.nutrition.iron)}mg`} colors={colors} />
-            </View>
-
-            {pairings.length > 0 && (
-              <View style={{ marginTop: spacing[4] }}>
-                <Label>PAIRS WELL WITH</Label>
-                <View style={styles.pairingRow}>
-                  {pairings.map((p) => (
-                    <View key={p} style={[styles.pairingChip, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                      <Text style={[type.bodySm, { color: colors.text }]}>{p}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <View style={{ marginTop: spacing[4] }}>
-              <Label>ENVIRONMENTAL IMPACT</Label>
-              <Text style={[type.h2, { color: palette.sageDeep, marginTop: 4 }]}>
-                {co2eAvoidedForMeal(c.co2eKg)} kg CO2 saved
-              </Text>
-            </View>
-
-            <View style={{ marginTop: spacing[6], gap: 8 }}>
-              <BrutalButton variant="sage" onPress={async () => {
-                await saveRecipeToVault(c);
-                toast.show('Saved to Offline Vault 💾', 'success');
-              }}>
-                <Text style={[type.label, { color: palette.chalk }]}>SAVE TO VAULT</Text>
-              </BrutalButton>
-              <BrutalButton variant="outline" onPress={async () => {
-                await removeRecipeFromVault(c.name);
-                toast.show('Removed from Vault', 'info');
-              }}>
-                <Text style={[type.label, { color: colors.text }]}>REMOVE FROM VAULT</Text>
-              </BrutalButton>
-            </View>
-
-            <View style={{ height: spacing[4] }} />
-          </ScrollView>
-
-          {/* Modal action buttons */}
-          <View style={styles.modalBtnRow}>
-            <PressScale onPress={() => { onCook(c); onClose(); }} style={{ flex: 1 }}>
-              <View style={[styles.actionBtn, { backgroundColor: palette.ink }]}>
-                <ChefHat size={15} color={palette.chalk} strokeWidth={2.5} />
-                <Text style={styles.actionBtnText}>COOK & LOG</Text>
-              </View>
-            </PressScale>
-            {c.missing.length > 0 && (
-              <PressScale onPress={() => { onShop(c); onClose(); }} style={{ flex: 1, marginLeft: 8 }}>
-                <View style={[styles.actionBtn, { backgroundColor: palette.sageDeep }]}>
-                  <ShoppingCart size={15} color={palette.chalk} strokeWidth={2.5} />
-                  <Text style={styles.actionBtnText}>SHOP MISSING</Text>
-                </View>
-              </PressScale>
-            )}
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function NutriBox({ label, value, colors }: { label: string; value: any; colors: any }) {
-  return (
-    <View style={[styles.nutriBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-      <Text style={[styles.nutriVal, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.nutriLabel, { color: colors.subText }]}>{label}</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   segmentContainer: {
@@ -614,7 +364,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
     padding: 4,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: 'rgba(2, 51, 45, 0.08)',
   },
   segmentBtn: {
     flex: 1,
@@ -636,31 +387,31 @@ const styles = StyleSheet.create({
   controls:         { marginBottom: spacing[4] },
   sliderRow:        { marginBottom: spacing[3] },
   sliderHead:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  sliderTrack:      { height: 28, flexDirection: 'row', alignItems: 'center', position: 'relative', backgroundColor: palette.paper, borderWidth: border.thick, borderColor: palette.ink, overflow: 'hidden' },
+  sliderTrack:      { height: 28, flexDirection: 'row', alignItems: 'center', position: 'relative', backgroundColor: palette.paper, borderWidth: 1, borderColor: 'rgba(2, 51, 45, 0.12)', borderRadius: 14, overflow: 'hidden' },
   sliderTick:       { width: '20%', height: '100%', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  sliderDot:        { width: 12, height: 12, borderWidth: border.thin, borderColor: palette.ink, backgroundColor: palette.chalk },
+  sliderDot:        { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: palette.goldenDays, backgroundColor: palette.chalk },
   sliderFill:       { position: 'absolute', left: 0, top: 0, bottom: 0, opacity: 0.3, zIndex: 1 },
 
   // Priority card
-  priorityCard:     { marginHorizontal: spacing[4], borderWidth: 1.5, borderRadius: 16, padding: spacing[4], marginBottom: spacing[4] },
+  priorityCard:     { marginHorizontal: spacing[4], borderWidth: 1, borderColor: 'rgba(2, 51, 45, 0.08)', borderRadius: 16, padding: spacing[4], marginBottom: spacing[4] },
   priorityTitle:    { fontSize: 13, fontFamily: font.sansBold, marginBottom: spacing[2], letterSpacing: 0.3 },
   priorityRow:      { flexDirection: 'row', gap: 8 },
-  priorityPill:     { paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1.5, borderRadius: 20 },
+  priorityPill:     { paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderRadius: 20 },
   priorityPillText: { fontSize: 12, fontFamily: font.sansBold },
   aiBtn:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16 },
   aiBtnText:        { fontSize: 12, fontFamily: font.sansBold, color: palette.chalk, letterSpacing: 0.3 },
 
   // Empty
-  emptyBox:         { marginHorizontal: spacing[4], alignItems: 'center', padding: spacing[8], borderWidth: 1.5, borderRadius: 20 },
+  emptyBox:         { marginHorizontal: spacing[4], alignItems: 'center', padding: spacing[8], borderWidth: 1, borderColor: 'rgba(2, 51, 45, 0.08)', borderRadius: 20 },
 
   // Cards
-  card:             { marginHorizontal: spacing[4], borderWidth: 1.5, borderRadius: 18, padding: spacing[4], marginBottom: spacing[3], overflow: 'visible' },
+  card:             { marginHorizontal: spacing[4], borderWidth: 1, borderColor: 'rgba(2, 51, 45, 0.08)', borderRadius: 18, padding: spacing[4], marginBottom: spacing[3], overflow: 'visible' },
   bestPickBadge:    { position: 'absolute', top: -10, left: 16, backgroundColor: palette.sageDeep, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   bestPickText:     { fontSize: 9, fontFamily: font.sansBold, color: palette.chalk, letterSpacing: 1 },
   cardHead:         { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing[3] },
   cardTitle:        { fontSize: 18, fontFamily: font.sansBold, lineHeight: 24 },
   cardSub:          { fontSize: 13, fontFamily: font.sans, marginTop: 2 },
-  favArea:          { padding: 6 },
+  favArea:          { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 
   // Score bars
   scoreGrid:        { flexDirection: 'row', gap: 10, marginBottom: spacing[3] },
@@ -679,7 +430,7 @@ const styles = StyleSheet.create({
   // Buttons
   btnRow:           { flexDirection: 'row' },
   actionBtnWrap:    {},
-  actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 },
+  actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, minHeight: 44 },
   actionBtnText:    { fontSize: 11, fontFamily: font.sansBold, color: palette.chalk, letterSpacing: 0.5 },
 
   // Modal
@@ -687,7 +438,7 @@ const styles = StyleSheet.create({
   modalSheet:       { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: spacing[5], paddingBottom: 40, paddingTop: 12, maxHeight: '92%' },
   modalHandle:      { width: 40, height: 4, borderRadius: 2, backgroundColor: palette.mist2, alignSelf: 'center', marginBottom: spacing[4] },
   modalHeader:      { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing[4] },
-  closeBtn:         { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  closeBtn:         { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   modalBtnRow:      { flexDirection: 'row', marginTop: spacing[4] },
 
   // Ingredients

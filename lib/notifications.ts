@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { supabase } from './supabase';
 
 // ─────────────────────────────────────────────────────────────────
 // NOTIFICATION PREFERENCES TYPE
@@ -261,5 +263,45 @@ export async function cancelAllNotifications() {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch (err) {
     console.warn('[Notifications] Failed cancelling notifications:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PUSH TOKEN REGISTRATION (Phase 5)
+// Registers the device with Expo push service and saves the token
+// to the user's push_tokens row in Supabase.
+// Call this once after auth + permissions are granted.
+// ─────────────────────────────────────────────────────────────────
+
+export async function registerPushToken(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return null;
+
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
+    if (!projectId) {
+      console.warn('[Notifications] No EAS projectId found — cannot register push token');
+      return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    const token = tokenData.data;
+
+    // Save to Supabase push_tokens table (upsert on user_id unique constraint)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('push_tokens')
+        .upsert({ user_id: user.id, token, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    }
+
+    return token;
+  } catch (err) {
+    console.warn('[Notifications] Push token registration error:', err);
+    return null;
   }
 }

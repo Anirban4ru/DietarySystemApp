@@ -16,9 +16,11 @@ import { ThemeProvider, ToastProvider, SplashOverlay, useTheme } from '@/compone
 import { ProProvider } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { ShieldAlert } from 'lucide-react-native';
 import {
   getNotificationPreferences,
   syncScheduledNotifications,
+  registerPushToken,
 } from '@/lib/notifications';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -26,8 +28,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 SplashScreen.preventAutoHideAsync();
 
 // ── Top-level ErrorBoundary ───────────────────────────────────────────────────
-// Catches any uncaught render errors and shows a recovery screen instead of
-// a blank white screen or a crash.
+// Catches any uncaught render errors and shows an opulent recovery screen
 interface EBState { hasError: boolean; message: string }
 class AppErrorBoundary extends Component<{ children: ReactNode }, EBState> {
   constructor(props: { children: ReactNode }) {
@@ -44,15 +45,20 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, EBState> {
     if (this.state.hasError) {
       return (
         <View style={ebStyles.container}>
-          <Text style={ebStyles.emoji}>😵</Text>
-          <Text style={ebStyles.title}>Something went wrong</Text>
-          <Text style={ebStyles.sub}>{this.state.message || 'An unexpected error occurred.'}</Text>
-          <TouchableOpacity
-            style={ebStyles.btn}
-            onPress={() => this.setState({ hasError: false, message: '' })}
-          >
-            <Text style={ebStyles.btnText}>Try again</Text>
-          </TouchableOpacity>
+          <View style={ebStyles.card}>
+            <View style={ebStyles.iconWrap}>
+              <ShieldAlert size={36} color="#7F1100" strokeWidth={1.8} />
+            </View>
+            <Text style={ebStyles.title}>Application Notice</Text>
+            <Text style={ebStyles.sub}>{this.state.message || 'An unexpected runtime state was encountered.'}</Text>
+            <TouchableOpacity
+              style={ebStyles.btn}
+              onPress={() => this.setState({ hasError: false, message: '' })}
+              activeOpacity={0.8}
+            >
+              <Text style={ebStyles.btnText}>RELOAD WORKSPACE</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -61,12 +67,13 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 }
 
 const ebStyles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#0f1f0f' },
-  emoji:     { fontSize: 56, marginBottom: 16 },
-  title:     { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 8 },
-  sub:       { fontSize: 14, color: '#aaa', textAlign: 'center', marginBottom: 32 },
-  btn:       { backgroundColor: '#4CAF8F', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 24 },
-  btnText:   { color: '#fff', fontWeight: '700', fontSize: 16 },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#DACFBD' },
+  card:      { width: '100%', maxWidth: 400, backgroundColor: '#F7F3EB', borderRadius: 24, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(2, 51, 45, 0.12)' },
+  iconWrap:  { width: 68, height: 68, borderRadius: 24, backgroundColor: '#FCE8E6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  title:     { fontSize: 20, fontWeight: '700', color: '#02332D', marginBottom: 8, letterSpacing: -0.3 },
+  sub:       { fontSize: 13, color: '#594E42', textAlign: 'center', marginBottom: 28, lineHeight: 19 },
+  btn:       { width: '100%', height: 48, backgroundColor: '#02332D', alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  btnText:   { color: '#DACFBD', fontWeight: '700', fontSize: 12, letterSpacing: 1.2 },
 });
 
 // ── Root layout ───────────────────────────────────────────────────────────────
@@ -87,25 +94,43 @@ export default function RootLayout() {
   const segments = useSegments();
   const router   = useRouter();
 
-  // Auth listener — handle onboarding redirect for new signups
+  // Auth listener — robust local & remote session synchronization
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    const initAuth = async () => {
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s) {
+          setSession(s);
+          await AsyncStorage.setItem('@nourish_session', JSON.stringify(s));
+        } else {
+          const local = await AsyncStorage.getItem('@nourish_session');
+          if (local) {
+            try {
+              setSession(JSON.parse(local));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        const local = await AsyncStorage.getItem('@nourish_session');
+        if (local) {
+          try {
+            setSession(JSON.parse(local));
+          } catch {}
+        }
+      }
       setAuthInit(true);
-    });
+    };
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
-      setSession(s);
-      // When a brand-new user signs in for the first time, send to onboarding
-      if (s && _e === 'SIGNED_IN') {
-        try {
-          const done = await AsyncStorage.getItem('@nourish_onboarding_done');
-          if (!done) {
-            // Small delay so auth state settles before navigating
-            setTimeout(() => router.replace('/onboarding' as any), 200);
-          }
-        } catch (_err) {
-          // ignore storage errors, let them into the app
+      if (s) {
+        setSession(s);
+        AsyncStorage.setItem('@nourish_session', JSON.stringify(s)).catch(() => {});
+        registerPushToken().catch(() => {});
+      } else {
+        const local = await AsyncStorage.getItem('@nourish_session');
+        if (!local) {
+          setSession(null);
         }
       }
     });
@@ -126,10 +151,14 @@ export default function RootLayout() {
 
     SplashScreen.hideAsync();
 
-    const timer = setTimeout(() => setAppReady(true), 100);
+    // Show opulent preloader on every app launch for high-end opening sequence
+    const timer = setTimeout(() => setAppReady(true), 1800);
 
-    // Only redirect to tabs if user is actively on the login screen and has a valid session
-    if (session && segments[0] === 'login') {
+    // Mandatory Authentication Gating:
+    // Unauthenticated users are strictly routed to /login. No guest bypass allowed.
+    if (!session && segments[0] !== 'login') {
+      router.replace('/login');
+    } else if (session && segments[0] === 'login') {
       router.replace('/(tabs)');
     }
 

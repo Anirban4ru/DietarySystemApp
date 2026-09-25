@@ -1,8 +1,6 @@
-const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 
-const projectRoot = __dirname;
-const config = getDefaultConfig(projectRoot);
+const config = getDefaultConfig(__dirname);
 
 config.resolver.blockList = [
   /.*[/\\]node_modules[/\\]expo-modules-core[/\\]expo-module-gradle-plugin[/\\]build[/\\]?.*/,
@@ -10,8 +8,5 @@ config.resolver.blockList = [
   /.*[/\\]node_modules[/\\]expo-updates[/\\]expo-updates-gradle-plugin[/\\]build[/\\]?.*/,
   /.*[/\\]android[/\\]app[/\\]build[/\\]?.*/,
 ];
-
-config.watchFolders = [projectRoot];
-config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
 
 module.exports = config;

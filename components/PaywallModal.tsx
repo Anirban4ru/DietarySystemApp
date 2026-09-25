@@ -5,10 +5,10 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import {
-  Crown, Sparkles, Check, X, ShieldCheck, Zap,
+  Crown, Check, X, ShieldCheck, Zap,
   Lock, RefreshCw, AlertCircle, CheckCircle2, ArrowRight
 } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticError, hapticSelection } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import { useTheme, SurfaceCard, PrimaryAction, SecondaryAction, useToast } from '@/components/ui';
 import { usePro, ProEntitlement } from '@/lib/hooks';
@@ -90,7 +90,7 @@ export function PaywallModal({
   if (!isVisible) return null;
 
   const handleUpgrade = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     setState('purchasing');
     setErrorMessage(null);
 
@@ -99,7 +99,7 @@ export function PaywallModal({
       await new Promise((res) => setTimeout(res, 1400));
       await unlockPro(selectedPlan);
       setState('success');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccess();
       toast.show('Welcome to Nourish+ Pro! All features unlocked.', 'success');
       setTimeout(() => {
         setState('idle');
@@ -108,12 +108,12 @@ export function PaywallModal({
     } catch (e: any) {
       setState('error');
       setErrorMessage(e.message || 'Subscription processing failed. Please check your connection.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hapticError();
     }
   };
 
   const handleRestore = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticTap();
     setState('restoring');
     setErrorMessage(null);
 
@@ -121,7 +121,7 @@ export function PaywallModal({
       await new Promise((res) => setTimeout(res, 1200));
       await unlockPro('annual');
       setState('success');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccess();
       toast.show('Purchases successfully restored.', 'success');
       setTimeout(() => {
         setState('idle');
@@ -130,7 +130,7 @@ export function PaywallModal({
     } catch (e: any) {
       setState('error');
       setErrorMessage(e.message || 'No prior purchases found to restore.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hapticError();
     }
   };
 
@@ -158,7 +158,7 @@ export function PaywallModal({
             </View>
 
             <View style={styles.tagWrap}>
-              <Sparkles size={12} color={palette.amberDeep} />
+              <Crown size={12} color={palette.amberDeep} />
               <Text style={styles.tagText}>INTELLIGENT KITCHEN COMPANION</Text>
             </View>
 
@@ -206,7 +206,7 @@ export function PaywallModal({
                     borderWidth: selectedPlan === 'annual' ? 2 : 1.5,
                   },
                 ]}
-                onPress={() => { Haptics.selectionAsync(); setSelectedPlan('annual'); }}
+                onPress={() => { hapticSelection(); setSelectedPlan('annual'); }}
                 accessibilityRole="radio"
                 accessibilityLabel="Annual plan: Rs 167 per month, billed Rs 1999 per year"
                 accessibilityState={{ selected: selectedPlan === 'annual' }}
@@ -232,7 +232,7 @@ export function PaywallModal({
                     borderWidth: selectedPlan === 'monthly' ? 2 : 1.5,
                   },
                 ]}
-                onPress={() => { Haptics.selectionAsync(); setSelectedPlan('monthly'); }}
+                onPress={() => { hapticSelection(); setSelectedPlan('monthly'); }}
                 accessibilityRole="radio"
                 accessibilityLabel="Monthly plan: Rs 299 per month, cancel anytime"
                 accessibilityState={{ selected: selectedPlan === 'monthly' }}
@@ -253,7 +253,7 @@ export function PaywallModal({
               </View>
               <Switch
                 value={enableTrial}
-                onValueChange={(val) => { Haptics.selectionAsync(); setEnableTrial(val); }}
+                onValueChange={(val) => { hapticSelection(); setEnableTrial(val); }}
                 trackColor={{ false: colors.border, true: palette.sageDeep }}
                 thumbColor={palette.chalk}
               />
@@ -300,7 +300,7 @@ export function PaywallModal({
                 onPress={handleUpgrade}
                 loading={state === 'purchasing'}
                 variant="sage"
-                icon={Sparkles}
+                icon={Crown}
               />
 
               <TouchableOpacity

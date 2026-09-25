@@ -23,14 +23,14 @@ import {
   AlertTriangle,
   Heart,
   ShoppingCart,
-  Sparkles,
+  ChefHat,
   UtensilsCrossed,
   X,
   Search,
   Check,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { hapticSuccess, hapticSelection, hapticWarning } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import {
   useTheme,
@@ -80,7 +80,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { plan, add, remove } = useMealPlan();
+  const { plan, loading, add, remove } = useMealPlan();
   const { favs, toggle: toggleFav } = useFavorites();
   const { items: pantryItems } = useInventory();
   const { addItems: addShopping } = useShoppingList();
@@ -123,7 +123,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
   const totalMeals = plan.length;
 
   const toggleExpand = (entryId: string, recipeName: string) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const isNowExpanded = expandedEntry !== entryId;
     setExpandedEntry(isNowExpanded ? entryId : null);
@@ -183,7 +183,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
     });
 
     await addShopping(toAdd);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     toast.show(`Added ${toAdd.length} missing items to grocery list`, 'success');
   };
 
@@ -207,7 +207,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
               <IconButton
                 icon={<Plus size={20} color={palette.chalk} strokeWidth={2.5} />}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  hapticSelection();
                   setAddModal({ day: activeDay, meal: 'Lunch' });
                 }}
                 accessibilityLabel="Add meal"
@@ -241,7 +241,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
                 <PressableScale
                   key={day}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticSelection();
                     setActiveDay(idx);
                   }}
                   accessibilityLabel={`${day}, ${count} meals scheduled`}
@@ -322,7 +322,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
           <PrimaryAction
             label="Schedule Meal"
             onPress={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setAddModal({ day: activeDay, meal: 'Lunch' });
             }}
             icon={<Plus size={16} color={palette.chalk} strokeWidth={2.5} />}
@@ -331,19 +331,27 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
           />
         </View>
 
+        {/* ── Loading Skeleton ── */}
+        {loading && (
+          <View style={{ gap: spacing[3], marginTop: 8 }}>
+            <SkeletonCard height={96} />
+            <SkeletonCard height={96} />
+          </View>
+        )}
+
         {/* ── Meals List ── */}
-        {dayPlan.length === 0 ? (
+        {!loading && dayPlan.length === 0 ? (
           <EmptyState
             title={`No meals planned for ${DAYS[activeDay]}`}
             description="Organize your meals ahead of time to optimize grocery spending and prevent ingredient spoilage."
             actionLabel={`Add ${DAYS[activeDay]} Meal`}
             onAction={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setAddModal({ day: activeDay, meal: 'Lunch' });
             }}
             icon={<UtensilsCrossed size={32} color={palette.forestDeep} strokeWidth={2} />}
           />
-        ) : (
+        ) : !loading ? (
           <View style={{ gap: spacing[3] }}>
             {dayPlan.map((entry, index) => {
               const isExpanded = expandedEntry === entry.id;
@@ -391,7 +399,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
                       <View style={styles.cardActionIcons}>
                         <PressableScale
                           onPress={() => {
-                            Haptics.selectionAsync();
+                            hapticSelection();
                             toggleFav(entry.recipe_name);
                             toast.show(
                               isFavorited
@@ -414,7 +422,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
 
                         <PressableScale
                           onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            hapticWarning();
                             remove(entry.id);
                             toast.show('Meal removed from plan', 'info');
                           }}
@@ -504,8 +512,8 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
                                       {
                                         backgroundColor: inPantry
                                           ? mode === 'dark'
-                                            ? 'rgba(61, 107, 53, 0.15)'
-                                            : 'rgba(61, 107, 53, 0.08)'
+                                            ? 'rgba(2, 51, 45, 0.25)'
+                                            : 'rgba(2, 51, 45, 0.08)'
                                           : colors.bg,
                                         borderColor: inPantry ? palette.forestDeep : colors.border,
                                       },
@@ -551,7 +559,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
                                   <View
                                     style={[
                                       styles.stepNumCircle,
-                                      { backgroundColor: 'rgba(61, 107, 53, 0.1)' },
+                                      { backgroundColor: 'rgba(2, 51, 45, 0.1)' },
                                     ]}
                                   >
                                     <Text style={[styles.stepNumText, { color: palette.forestDeep }]}>
@@ -572,7 +580,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
                           <SecondaryAction
                             label="Fetch Recipe Details"
                             onPress={() => fetchAiRecipe(entry.id, entry.recipe_name)}
-                            icon={<Sparkles size={14} color={colors.text} strokeWidth={2} />}
+                            icon={<ChefHat size={14} color={colors.text} strokeWidth={2} />}
                             size="sm"
                             style={{ alignSelf: 'flex-start', marginTop: spacing[2] }}
                           />
@@ -584,7 +592,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
               );
             })}
           </View>
-        )}
+        ) : null}
 
         {/* ── Favorite Recipes Quick Add ── */}
         {favs.length > 0 && (
@@ -601,7 +609,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
                 <PressableScale
                   key={favoriteName}
                   onPress={() => {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    hapticSuccess();
                     add(activeDay, 'Dinner', favoriteName);
                     toast.show(`Added "${favoriteName}" to ${DAYS[activeDay]} Dinner`, 'success');
                   }}
@@ -629,7 +637,7 @@ export function MealPlanView({ embedded = false }: { embedded?: boolean }) {
         dayName={addModal ? DAYS[addModal.day] : ''}
         onClose={() => setAddModal(null)}
         onAdd={(mealType, recipeName) => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          hapticSuccess();
           if (addModal) add(addModal.day, mealType, recipeName);
           setAddModal(null);
           toast.show(`Added "${recipeName}" to ${DAYS[addModal?.day || 0]} ${mealType}`, 'success');
@@ -717,7 +725,7 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
                 <PressableScale
                   key={m}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticSelection();
                     setMeal(m);
                   }}
                   style={[
@@ -755,7 +763,7 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
             <Search size={18} color={colors.subText} strokeWidth={2} style={{ marginRight: 8 }} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="e.g. Lentil Shepherd's Pie, Green Bowl..."
+              placeholder="Search or plan a meal"
               placeholderTextColor={colors.subText}
               value={recipe}
               onChangeText={handleSearch}
@@ -782,7 +790,7 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
                     <PressableScale
                       key={`${suggestionName}-${idx}`}
                       onPress={() => {
-                        Haptics.selectionAsync();
+                        hapticSelection();
                         setRecipe(suggestionName);
                       }}
                       style={[
@@ -790,14 +798,14 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
                         {
                           backgroundColor: isChosen
                             ? mode === 'dark'
-                              ? 'rgba(61, 107, 53, 0.2)'
-                              : 'rgba(61, 107, 53, 0.08)'
+                              ? 'rgba(2, 51, 45, 0.25)'
+                              : 'rgba(2, 51, 45, 0.08)'
                             : colors.bg,
                           borderColor: isChosen ? palette.forestDeep : colors.border,
                         },
                       ]}
                     >
-                      <Sparkles
+                      <ChefHat
                         size={14}
                         color={isChosen ? palette.forestDeep : colors.subText}
                         strokeWidth={2}
@@ -909,7 +917,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: 'rgba(61, 107, 53, 0.1)',
+    backgroundColor: 'rgba(2, 51, 45, 0.1)',
   },
   mealTypeText: {
     fontSize: 11,
@@ -958,7 +966,7 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: '#888',
+    backgroundColor: 'rgba(2, 51, 45, 0.25)',
   },
   expandedContainer: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -1067,7 +1075,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(61, 107, 53, 0.1)',
+    backgroundColor: 'rgba(2, 51, 45, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },

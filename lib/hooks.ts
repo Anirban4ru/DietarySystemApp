@@ -191,97 +191,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const STARTER_GUEST_INVENTORY: InventoryRow[] = [
-  {
-    id: 'starter-1',
-    name: 'Toor Dal',
-    category: 'protein',
-    quantity: 500,
-    unit: 'g',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 180 * 86400000).toISOString(),
-    freshness_score: 0.99,
-    notes: 'Dal tadka, dal fry, sambar — perfect base',
-  },
-  {
-    id: 'starter-2',
-    name: 'Aloo',
-    category: 'root',
-    quantity: 6,
-    unit: 'pcs',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 20 * 86400000).toISOString(),
-    freshness_score: 0.92,
-    notes: 'Sabzi, paratha, or dum aloo',
-  },
-  {
-    id: 'starter-3',
-    name: 'Palak',
-    category: 'leafy_green',
-    quantity: 1,
-    unit: 'bunch',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 2 * 86400000).toISOString(),
-    freshness_score: 0.72,
-    notes: 'Palak paneer or palak dal — use soon!',
-  },
-  {
-    id: 'starter-4',
-    name: 'Paneer',
-    category: 'dairy',
-    quantity: 200,
-    unit: 'g',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 3 * 86400000).toISOString(),
-    freshness_score: 0.85,
-    notes: 'Fresh from local dairy — use within 3 days',
-  },
-  {
-    id: 'starter-5',
-    name: 'Chawal',
-    category: 'grain',
-    quantity: 1,
-    unit: 'kg',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-    freshness_score: 0.99,
-    notes: 'Basmati rice — biryani, pulao or simple chawal dal',
-  },
-  {
-    id: 'starter-6',
-    name: 'Tamatar',
-    category: 'fruit',
-    quantity: 4,
-    unit: 'pcs',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 5 * 86400000).toISOString(),
-    freshness_score: 0.88,
-    notes: 'Gravy base for most Indian curries',
-  },
-  {
-    id: 'starter-7',
-    name: 'Pyaaz',
-    category: 'allium',
-    quantity: 5,
-    unit: 'pcs',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 25 * 86400000).toISOString(),
-    freshness_score: 0.95,
-    notes: 'Essential for every sabzi and curry',
-  },
-  {
-    id: 'starter-8',
-    name: 'Dahi',
-    category: 'dairy',
-    quantity: 400,
-    unit: 'g',
-    added_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 4 * 86400000).toISOString(),
-    freshness_score: 0.90,
-    notes: 'Raita, kadhi, or marinade for tandoori',
-  },
-];
-
 export function useInventory() {
   const [items, setItems] = useState<InventoryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -291,17 +200,7 @@ export function useInventory() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_inventory');
-        if (stored) {
-          setItems(JSON.parse(stored));
-        } else {
-          setItems(STARTER_GUEST_INVENTORY);
-          await AsyncStorage.setItem('@nourish_guest_inventory', JSON.stringify(STARTER_GUEST_INVENTORY));
-        }
-      } catch {
-        setItems(STARTER_GUEST_INVENTORY);
-      }
+      setItems([]);
       setLoading(false);
       return;
     }
@@ -421,46 +320,70 @@ export function useInventory() {
   return { items, loading, error, reload: load, add, remove };
 }
 
-const DEFAULT_GUEST_PROFILE: ProfileRow = {
-  id: 'guest-profile-id',
-  name: 'Chef',
-  age: 28,
-  sex: 'female',
-  weight_kg: 68,
-  height_cm: 168,
-  activity_level: 'moderate',
-  conditions: [],
-  updated_at: new Date().toISOString(),
-};
-
 export function useProfile() {
-  const [profile, setProfile] = useState<ProfileRow | null>(DEFAULT_GUEST_PROFILE);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_profile');
-        if (stored) {
-          setProfile(JSON.parse(stored));
-        } else {
-          setProfile(DEFAULT_GUEST_PROFILE);
+    // Instant zero-lag local profile load
+    try {
+      const local = await AsyncStorage.getItem('@nourish_user_profile');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (parsed?.name) {
+          setProfile(parsed);
         }
-      } catch {
-        setProfile(DEFAULT_GUEST_PROFILE);
       }
-      setLoading(false);
-      return;
+    } catch {}
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        const local = await AsyncStorage.getItem('@nourish_user_profile');
+        if (local) {
+          try {
+            const parsed = JSON.parse(local);
+            if (parsed?.name) {
+              setProfile(parsed);
+              setLoading(false);
+              return;
+            }
+          } catch {}
+        }
+        setLoading(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('user_profile')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setProfile(data as ProfileRow);
+        await AsyncStorage.setItem('@nourish_user_profile', JSON.stringify(data));
+      } else {
+        const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '';
+        const defaultProfile: ProfileRow = {
+          id: user.id,
+          name: fallbackName,
+          age: 26,
+          sex: 'male',
+          weight_kg: 70,
+          height_cm: 170,
+          activity_level: 'moderate',
+          conditions: [],
+          updated_at: new Date().toISOString(),
+        };
+        setProfile(defaultProfile);
+        await AsyncStorage.setItem('@nourish_user_profile', JSON.stringify(defaultProfile));
+      }
+    } catch (e) {
+      console.warn('[useProfile load]', e);
     }
-    const { data } = await supabase
-      .from('user_profile')
-      .select('*')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    setProfile(data as ProfileRow | null);
     setLoading(false);
   }, []);
 
@@ -675,18 +598,25 @@ export function useFavorites() {
       return;
     }
 
-    if (favs.includes(recipeName)) {
-      await supabase
-        .from('recipe_favorites')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('recipe_name', recipeName);
-      setFavs((prev) => prev.filter((f) => f !== recipeName));
-    } else {
-      await supabase
-        .from('recipe_favorites')
-        .insert({ user_id: user.id, recipe_name: recipeName });
-      setFavs((prev) => [recipeName, ...prev]);
+    const wasFav = favs.includes(recipeName);
+    // Optimistic UI update immediately
+    setFavs((prev) => (wasFav ? prev.filter((f) => f !== recipeName) : [recipeName, ...prev]));
+
+    try {
+      if (wasFav) {
+        await supabase
+          .from('recipe_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('recipe_name', recipeName);
+      } else {
+        await supabase
+          .from('recipe_favorites')
+          .insert({ user_id: user.id, recipe_name: recipeName });
+      }
+    } catch (err) {
+      console.warn('Favorite toggle sync error, rolling back:', err);
+      setFavs((prev) => (wasFav ? [recipeName, ...prev] : prev.filter((f) => f !== recipeName)));
     }
   }, [favs]);
 
@@ -701,32 +631,15 @@ export interface ShoppingItem {
   checked: boolean;
 }
 
-const STARTER_GUEST_SHOPPING: ShoppingItem[] = [
-  { id: 'shop-1', item_name: 'Extra Virgin Olive Oil', category: 'pantry', quantity: 1, checked: false },
-  { id: 'shop-2', item_name: 'Rolled Oats', category: 'grain', quantity: 1, checked: false },
-  { id: 'shop-3', item_name: 'Chia Seeds', category: 'other', quantity: 1, checked: false },
-  { id: 'shop-4', item_name: 'Fresh Lemons', category: 'fresh_produce', quantity: 4, checked: false },
-];
-
 export function useShoppingList() {
-  const [items, setItems] = useState<ShoppingItem[]>(STARTER_GUEST_SHOPPING);
+  const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_shopping');
-        if (stored) {
-          setItems(JSON.parse(stored));
-        } else {
-          setItems(STARTER_GUEST_SHOPPING);
-          await AsyncStorage.setItem('@nourish_guest_shopping', JSON.stringify(STARTER_GUEST_SHOPPING));
-        }
-      } catch {
-        setItems(STARTER_GUEST_SHOPPING);
-      }
+      setItems([]);
       setLoading(false);
       return;
     }
@@ -775,40 +688,59 @@ export function useShoppingList() {
 
   const toggleCheck = useCallback(async (id: string, checked: boolean) => {
     const { data: { user } } = await supabase.auth.getUser();
+    // Optimistic update immediately
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked } : i)));
+
     if (!user) {
-      setItems((prev) => {
+      AsyncStorage.getItem('@nourish_guest_shopping').then((raw) => {
+        const prev: ShoppingItem[] = raw ? JSON.parse(raw) : [];
         const updated = prev.map((i) => (i.id === id ? { ...i, checked } : i));
         AsyncStorage.setItem('@nourish_guest_shopping', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
+      }).catch(() => {});
       return;
     }
 
-    await supabase
-      .from('shopping_list')
-      .update({ checked })
-      .eq('id', id)
-      .eq('user_id', user.id);
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked } : i)));
+    try {
+      await supabase
+        .from('shopping_list')
+        .update({ checked })
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (err) {
+      console.warn('Shopping check sync error, rolling back:', err);
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: !checked } : i)));
+    }
   }, []);
 
   const remove = useCallback(async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
+    let removedItem: ShoppingItem | undefined;
+    setItems((prev) => {
+      removedItem = prev.find((i) => i.id === id);
+      return prev.filter((i) => i.id !== id);
+    });
+
     if (!user) {
-      setItems((prev) => {
+      AsyncStorage.getItem('@nourish_guest_shopping').then((raw) => {
+        const prev: ShoppingItem[] = raw ? JSON.parse(raw) : [];
         const updated = prev.filter((i) => i.id !== id);
         AsyncStorage.setItem('@nourish_guest_shopping', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
+      }).catch(() => {});
       return;
     }
 
-    await supabase
-      .from('shopping_list')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    try {
+      await supabase
+        .from('shopping_list')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (err) {
+      console.warn('Shopping remove sync error, rolling back:', err);
+      if (removedItem) {
+        setItems((prev) => [removedItem!, ...prev]);
+      }
+    }
   }, []);
 
   const clearChecked = useCallback(async () => {
@@ -845,35 +777,15 @@ export interface MealPlanEntry {
   planned_date: string | null;
 }
 
-const STARTER_GUEST_PLAN: MealPlanEntry[] = [
-  { id: 'plan-1', day_of_week: 0, meal_type: 'Lunch', recipe_name: 'Green Power Bowl', planned_date: new Date().toISOString().slice(0, 10) },
-  { id: 'plan-2', day_of_week: 0, meal_type: 'Dinner', recipe_name: 'Tuscan White Bean Soup', planned_date: new Date().toISOString().slice(0, 10) },
-  { id: 'plan-3', day_of_week: 1, meal_type: 'Dinner', recipe_name: 'Rescue Stir-Fry', planned_date: null },
-  { id: 'plan-4', day_of_week: 2, meal_type: 'Breakfast', recipe_name: 'Overnight Chia Oats', planned_date: null },
-  { id: 'plan-5', day_of_week: 2, meal_type: 'Dinner', recipe_name: 'Chicken & Herb Quinoa', planned_date: null },
-  { id: 'plan-6', day_of_week: 3, meal_type: 'Lunch', recipe_name: 'Mediterranean Salad', planned_date: null },
-  { id: 'plan-7', day_of_week: 4, meal_type: 'Dinner', recipe_name: 'Roasted Root Plate', planned_date: null },
-];
-
 export function useMealPlan() {
-  const [plan, setPlan] = useState<MealPlanEntry[]>(STARTER_GUEST_PLAN);
+  const [plan, setPlan] = useState<MealPlanEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_meal_plan');
-        if (stored) {
-          setPlan(JSON.parse(stored));
-        } else {
-          setPlan(STARTER_GUEST_PLAN);
-          await AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify(STARTER_GUEST_PLAN));
-        }
-      } catch {
-        setPlan(STARTER_GUEST_PLAN);
-      }
+      setPlan([]);
       setLoading(false);
       return;
     }
@@ -897,57 +809,77 @@ export function useMealPlan() {
     const today = new Date();
     today.setDate(today.getDate() + day_of_week);
     const dateStr = today.toISOString().slice(0, 10);
+    const tempId = 'plan-' + Math.random().toString(36).substr(2, 9);
     const tempEntry: MealPlanEntry = {
-      id: 'plan-' + Math.random().toString(36).substr(2, 9),
+      id: tempId,
       day_of_week,
       meal_type,
       recipe_name,
       planned_date: dateStr,
     };
 
+    // Optimistic addition
+    setPlan((prev) => [...prev, tempEntry]);
+
     if (!user) {
-      setPlan((prev) => {
-        const updated = [...prev, tempEntry];
-        AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
+      AsyncStorage.getItem('@nourish_guest_meal_plan').then((raw) => {
+        const prev = raw ? JSON.parse(raw) : [];
+        AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify([...prev, tempEntry])).catch(() => {});
+      }).catch(() => {});
       return;
     }
 
-    const { data, error } = await supabase
-      .from('meal_plan')
-      .insert({
-        user_id: user.id,
-        day_of_week,
-        meal_type,
-        recipe_name,
-        planned_date: dateStr,
-      })
-      .select()
-      .single();
-    if (error) {
-      console.warn('Meal plan insert error:', error);
+    try {
+      const { data, error } = await supabase
+        .from('meal_plan')
+        .insert({
+          user_id: user.id,
+          day_of_week,
+          meal_type,
+          recipe_name,
+          planned_date: dateStr,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        // Swap temp id for real db id
+        setPlan((prev) => prev.map((p) => (p.id === tempId ? (data as MealPlanEntry) : p)));
+      }
+    } catch (err) {
+      console.warn('Meal plan insert sync error, rolling back:', err);
+      setPlan((prev) => prev.filter((p) => p.id !== tempId));
     }
-    if (data) setPlan((prev) => [...prev, data as MealPlanEntry]);
   }, []);
 
   const remove = useCallback(async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
+    let removedEntry: MealPlanEntry | undefined;
+    setPlan((prev) => {
+      removedEntry = prev.find((p) => p.id === id);
+      return prev.filter((p) => p.id !== id);
+    });
+
     if (!user) {
-      setPlan((prev) => {
-        const updated = prev.filter((p) => p.id !== id);
-        AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
+      AsyncStorage.getItem('@nourish_guest_meal_plan').then((raw) => {
+        const prev: MealPlanEntry[] = raw ? JSON.parse(raw) : [];
+        AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify(prev.filter((p) => p.id !== id))).catch(() => {});
+      }).catch(() => {});
       return;
     }
 
-    await supabase
-      .from('meal_plan')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-    setPlan((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await supabase
+        .from('meal_plan')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (err) {
+      console.warn('Meal plan remove sync error, rolling back:', err);
+      if (removedEntry) {
+        setPlan((prev) => [...prev, removedEntry!]);
+      }
+    }
   }, []);
 
   return { plan, loading, add, remove };

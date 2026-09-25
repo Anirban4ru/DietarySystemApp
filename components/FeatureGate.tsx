@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { Lock, Sparkles, ChevronRight } from 'lucide-react-native';
+import { Lock, Crown, ChevronRight } from 'lucide-react-native';
 import { palette, type, spacing, font } from '@/lib/theme';
 import { useTheme, SurfaceCard, PrimaryAction, ProBadge } from './ui';
 import { usePro, ProEntitlement } from '@/lib/hooks';
@@ -67,7 +67,7 @@ export function FeatureGate({
       {/* Top Header Badge */}
       <View style={styles.gateHeader}>
         <View style={styles.proPill}>
-          <Sparkles size={13} color={palette.amberDeep} />
+          <Crown size={13} color={palette.amberDeep} />
           <Text style={styles.proPillText}>NOURISH+ PRO FEATURE</Text>
         </View>
         <Lock size={18} color={palette.amberDeep} strokeWidth={2.2} />
@@ -90,7 +90,7 @@ export function FeatureGate({
         <PrimaryAction
           label={`Unlock ${title}`}
           onPress={() => openPaywallFor(feature)}
-          icon={Sparkles}
+          icon={Crown}
           variant="sage"
         />
       </View>

@@ -1,8 +1,9 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   ScrollView,
   TouchableOpacity,
   Modal,
@@ -19,11 +20,10 @@ import {
   ShoppingBag,
   Search,
   CheckCircle2,
-  Sparkles,
   Layers,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticWarning, hapticSelection } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import {
   useTheme,
@@ -35,6 +35,7 @@ import {
   SecondaryAction,
   IconButton,
   EmptyState,
+  SkeletonCard,
 } from '@/components/ui';
 import { PressableScale } from '@/components/motion';
 import { useShoppingList } from '@/lib/hooks';
@@ -45,19 +46,30 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { items, addItems, toggleCheck, remove, clearChecked } = useShoppingList();
+  const { items, loading, addItems, toggleCheck, remove, clearChecked } = useShoppingList();
   const [addModal, setAddModal] = useState(false);
 
   const unchecked = useMemo(() => items.filter((i) => !i.checked), [items]);
   const checked = useMemo(() => items.filter((i) => i.checked), [items]);
 
-  const handleCheck = (id: string, val: boolean) => {
-    Haptics.impactAsync(val ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+  const handleCheck = useCallback((id: string, val: boolean) => {
+    hapticTap();
     toggleCheck(id, val);
     if (val) {
       toast.show('Item moved to basket', 'success');
     }
-  };
+  }, [toggleCheck, toast]);
+
+  const handleDelete = useCallback((id: string) => {
+    hapticWarning();
+    remove(id);
+  }, [remove]);
+
+  const handleClearChecked = useCallback(() => {
+    hapticSuccess();
+    clearChecked();
+    toast.show('Cleared completed items', 'info');
+  }, [clearChecked, toast]);
 
   const progressPct = items.length > 0 ? Math.round((checked.length / items.length) * 100) : 0;
 
@@ -86,7 +98,7 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
               <IconButton
                 icon={<Plus size={20} color={palette.chalk} strokeWidth={2.5} />}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  hapticSelection();
                   setAddModal(true);
                 }}
                 accessibilityLabel="Add grocery item"
@@ -126,8 +138,18 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
           </SurfaceCard>
         )}
 
+        {/* ── Loading Skeleton ── */}
+        {loading && (
+          <View style={{ gap: spacing[2], marginTop: 12 }}>
+            <SkeletonCard height={68} />
+            <SkeletonCard height={68} />
+            <SkeletonCard height={68} />
+            <SkeletonCard height={68} />
+          </View>
+        )}
+
         {/* ── Empty State ── */}
-        {items.length === 0 && (
+        {!loading && items.length === 0 && (
           <EmptyState
             title="Shopping list is clear"
             description="Missing meal ingredients from your weekly plan and recipes appear here automatically. You can also add custom pantry staples."
@@ -144,11 +166,13 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>To Purchase</Text>
               <StatusBadge label={`${unchecked.length} items`} variant="neutral" size="sm" />
             </View>
-
-            <View style={{ gap: spacing[2] }}>
-              {unchecked.map((item) => (
+            <FlatList
+              data={unchecked}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              contentContainerStyle={{ gap: spacing[2] }}
+              renderItem={({ item }) => (
                 <ShoppingItemRow
-                  key={item.id}
                   id={item.id}
                   name={item.item_name}
                   category={item.category}
@@ -156,13 +180,10 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
                   checked={false}
                   colors={colors}
                   onCheck={() => handleCheck(item.id, true)}
-                  onDelete={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    remove(item.id);
-                  }}
+                  onDelete={() => handleDelete(item.id)}
                 />
-              ))}
-            </View>
+              )}
+            />
           </View>
         )}
 
@@ -175,11 +196,7 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>In Basket</Text>
               </View>
               <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  clearChecked();
-                  toast.show('Cleared completed items', 'info');
-                }}
+                onPress={handleClearChecked}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={styles.clearBtn}
               >
@@ -188,11 +205,13 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
                 </Text>
               </TouchableOpacity>
             </View>
-
-            <View style={{ gap: spacing[2] }}>
-              {checked.map((item) => (
+            <FlatList
+              data={checked}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              contentContainerStyle={{ gap: spacing[2] }}
+              renderItem={({ item }) => (
                 <ShoppingItemRow
-                  key={item.id}
                   id={item.id}
                   name={item.item_name}
                   category={item.category}
@@ -200,13 +219,10 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
                   checked={true}
                   colors={colors}
                   onCheck={() => handleCheck(item.id, false)}
-                  onDelete={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    remove(item.id);
-                  }}
+                  onDelete={() => handleDelete(item.id)}
                 />
-              ))}
-            </View>
+              )}
+            />
           </View>
         )}
       </ScrollView>
@@ -233,7 +249,7 @@ interface ShoppingItemRowProps {
   onDelete: () => void;
 }
 
-function ShoppingItemRow({
+const ShoppingItemRow = React.memo(function ShoppingItemRow({
   name,
   category,
   qty,
@@ -312,7 +328,7 @@ function ShoppingItemRow({
       </View>
     </SurfaceCard>
   );
-}
+});
 
 // ─── Add Grocery Modal ───────────────────────────────────────────
 interface AddShoppingModalProps {
@@ -352,7 +368,7 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
   };
 
   const handlePick = async (name: string, category: string = 'other') => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticTap();
     await onAdd([{ item_name: name, category, quantity: 1 }]);
     setQuery('');
     setResults([]);
@@ -393,7 +409,7 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
             <Search size={18} color={colors.subText} strokeWidth={2} style={{ marginRight: 8 }} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="e.g. Greek Yogurt, Oats, Kale..."
+              placeholder="Search or add grocery item"
               placeholderTextColor={colors.subText}
               value={query}
               onChangeText={handleSearch}
@@ -443,7 +459,7 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
                     styles.resultRow,
                     {
                       backgroundColor:
-                        mode === 'dark' ? 'rgba(61, 107, 53, 0.2)' : 'rgba(61, 107, 53, 0.08)',
+                        mode === 'dark' ? 'rgba(2, 51, 45, 0.2)' : 'rgba(2, 51, 45, 0.08)',
                       borderColor: palette.forestDeep,
                     },
                   ]}

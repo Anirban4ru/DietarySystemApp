@@ -10,7 +10,7 @@ import {
   Easing,
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticHeavy, hapticSelection } from '@/lib/haptics';
 import { palette } from '@/lib/theme';
 
 // ─────────────────────────────────────────────────────────────────
@@ -85,10 +85,10 @@ export function PressableScale({
   const handlePressIn = () => {
     if (disabled) return;
     if (haptic !== 'none') {
-      if (haptic === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      else if (haptic === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      else if (haptic === 'heavy') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      else Haptics.selectionAsync();
+      if (haptic === 'light') hapticTap();
+      else if (haptic === 'medium') hapticTap();
+      else if (haptic === 'heavy') hapticHeavy();
+      else hapticSelection();
     }
 
     if (!reducedMotion) {

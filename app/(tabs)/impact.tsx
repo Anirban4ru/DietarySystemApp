@@ -26,11 +26,10 @@ import {
   CheckCircle2,
   Users,
   Calendar,
-  Sparkles,
   ArrowUpRight,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { hapticSuccess, hapticSelection } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import {
   useTheme,
@@ -74,9 +73,9 @@ export default function ImpactScreen() {
     [summary]
   );
 
-  // Financial savings estimate ($4.50/meal rescued + $2.20/consumed pantry item)
+  // Financial savings estimate (₹120/meal rescued + ₹50/consumed pantry item)
   const moneySaved = useMemo(() => {
-    return (summary.mealsRescued * 4.5 + summary.itemsConsumed * 2.2).toFixed(2);
+    return Math.round(summary.mealsRescued * 120 + summary.itemsConsumed * 50);
   }, [summary]);
 
   // Waste avoided in kg (~0.45kg per rescued meal)
@@ -121,7 +120,7 @@ export default function ImpactScreen() {
     },
     money: {
       title: 'Financial Savings',
-      desc: 'Calculated using national average grocery replenishment costs ($4.50/meal rescue, $2.20/pantry item consumed before spoilage).',
+      desc: 'Calculated using national average grocery costs (₹120/meal rescue, ₹50/pantry item consumed before spoilage).',
     },
     waste: {
       title: 'Food Waste Avoided',
@@ -149,7 +148,7 @@ export default function ImpactScreen() {
           subtitle="Your environmental and financial footprint"
           rightAction={
             summary.streakDays > 0 ? (
-              <View style={[styles.streakPill, { backgroundColor: 'rgba(217, 119, 6, 0.12)' }]}>
+              <View style={[styles.streakPill, { backgroundColor: 'rgba(191, 152, 97, 0.15)' }]}>
                 <Flame size={15} color={palette.saffron} fill={palette.saffron} strokeWidth={2} />
                 <Text style={[styles.streakText, { color: palette.saffron }]}>
                   {summary.streakDays}d streak
@@ -200,7 +199,7 @@ export default function ImpactScreen() {
           {/* CO2e Saved */}
           <PressableScale
             onPress={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setActiveMetricInfo(activeMetricInfo === 'co2e' ? null : 'co2e');
             }}
             style={styles.metricGridItem}
@@ -218,25 +217,25 @@ export default function ImpactScreen() {
           {/* Money Saved */}
           <PressableScale
             onPress={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setActiveMetricInfo(activeMetricInfo === 'money' ? null : 'money');
             }}
             style={styles.metricGridItem}
           >
             <MetricCard
               label="Money Saved"
-              value={`$${moneySaved}`}
+              value={`₹${moneySaved.toLocaleString('en-IN')}`}
               unit="saved"
               change="Est. pantry value"
               isPositive={true}
-              icon={<DollarSign size={16} color={palette.forestDeep} strokeWidth={2.5} />}
+              icon={<TrendingUp size={16} color={palette.forestDeep} strokeWidth={2.5} />}
             />
           </PressableScale>
 
           {/* Food Waste Avoided */}
           <PressableScale
             onPress={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setActiveMetricInfo(activeMetricInfo === 'waste' ? null : 'waste');
             }}
             style={styles.metricGridItem}
@@ -254,7 +253,7 @@ export default function ImpactScreen() {
           {/* Meals Rescued */}
           <PressableScale
             onPress={() => {
-              Haptics.selectionAsync();
+              hapticSelection();
               setActiveMetricInfo(activeMetricInfo === 'rescued' ? null : 'rescued');
             }}
             style={styles.metricGridItem}
@@ -265,7 +264,7 @@ export default function ImpactScreen() {
               unit="cooked"
               change={`${summary.itemsDiscarded} discarded`}
               isPositive={summary.mealsRescued >= summary.itemsDiscarded}
-              icon={<Sparkles size={16} color={palette.forestDeep} strokeWidth={2.5} />}
+              icon={<Award size={16} color={palette.forestDeep} strokeWidth={2.5} />}
             />
           </PressableScale>
         </View>
@@ -302,7 +301,7 @@ export default function ImpactScreen() {
             labels={chartData.labels}
             unit="kg"
             strokeColor={palette.forestDeep}
-            fillColor={mode === 'dark' ? 'rgba(61, 107, 53, 0.25)' : 'rgba(61, 107, 53, 0.12)'}
+            fillColor={mode === 'dark' ? 'rgba(2, 51, 45, 0.25)' : 'rgba(2, 51, 45, 0.12)'}
             chartType="line"
             height={150}
           />
@@ -317,7 +316,7 @@ export default function ImpactScreen() {
             </View>
             <PressableScale
               onPress={() => {
-                Haptics.selectionAsync();
+                hapticSelection();
                 setGoalModal(true);
               }}
               hitSlop={8}
@@ -399,7 +398,7 @@ export default function ImpactScreen() {
             <View style={[styles.compareDivider, { backgroundColor: colors.border }]} />
 
             <View style={styles.compareCol}>
-              <Text style={[styles.compareColLabel, { color: colors.subText }]}>AVERAGE US HOUSEHOLD</Text>
+              <Text style={[styles.compareColLabel, { color: colors.subText }]}>AVERAGE HOUSEHOLD</Text>
               <Text style={[styles.compareColNumber, { color: colors.text }]}>
                 {comparison.avgRate}
               </Text>
@@ -453,7 +452,7 @@ export default function ImpactScreen() {
                       styles.badgeIconCircle,
                       {
                         backgroundColor: isUnlocked
-                          ? 'rgba(61, 107, 53, 0.12)'
+                          ? 'rgba(2, 51, 45, 0.12)'
                           : 'rgba(0,0,0,0.05)',
                       },
                     ]}
@@ -497,8 +496,8 @@ export default function ImpactScreen() {
               const bg =
                 d.count === 0
                   ? mode === 'dark'
-                    ? 'rgba(61, 107, 53, 0.3)'
-                    : 'rgba(61, 107, 53, 0.15)'
+                    ? 'rgba(2, 51, 45, 0.3)'
+                    : 'rgba(2, 51, 45, 0.15)'
                   : d.count === 1
                   ? palette.saffron
                   : palette.burgundy;
@@ -590,7 +589,7 @@ function GoalModal({ visible, onClose, goals, onSave }: GoalModalProps) {
   const [co2e, setCo2e] = useState(String(goals.target_co2e));
 
   const handleSave = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     await onSave(Number(meals) || 5, Number(co2e) || 10);
     onClose();
   };
@@ -705,7 +704,7 @@ const styles = StyleSheet.create({
   metricInfoCard: {
     padding: spacing[3],
     marginBottom: spacing[3],
-    backgroundColor: 'rgba(61, 107, 53, 0.08)',
+    backgroundColor: 'rgba(2, 51, 45, 0.08)',
   },
   infoTitle: {
     fontSize: 13,

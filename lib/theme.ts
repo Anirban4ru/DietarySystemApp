@@ -1,47 +1,54 @@
 import { StyleSheet } from 'react-native';
 
 export const palette = {
-  // ── Warm Aristocratic Neutrals ────────────────────────────────
-  bone:         '#FAFAF7',    // Warm ivory — primary bg
-  paper:        '#F2EDE4',    // Aged parchment
-  chalk:        '#FFFFFF',    // Pure white surfaces
-  ink:          '#1C1917',    // Warm charcoal (not cold black)
-  slate:        '#44403C',    // Warm dark gray
-  slate2:       '#78716C',    // Warm stone
-  mist:         '#A8A29E',    // Warm muted
-  mist2:        '#D6D3D1',    // Soft warm gray
-  hair:         '#E7E5E0',    // Warm light border
-  hairLight:    'rgba(255,255,255,0.15)',
+  // ── Exact Palette from Reference ──────────────────────────────
+  // 1. Royal Green Qilin (#02332D) — Signature luxury brand color
+  royalGreen:   '#02332D',
+  sage:         '#0A423B',    // Mid royal green
+  sageDeep:     '#02332D',    // Signature Royal Green Qilin
+  forestDeep:   '#02332D',    // Signature Royal Green Qilin
+  sageMist:     '#E5EBEA',    // Pale Royal Green tint
 
-  // ── Signature Forest Greens (fresh herbs, nature) ─────────────
-  sage:         '#3D6B35',    // Forest green
-  sageDeep:     '#1E4D18',    // Deep forest
-  forestDeep:   '#1E4D18',    // Semantic deep forest green
-  sageMist:     '#EDF5EB',    // Mint tint
+  // 2. White Cream (#DACFBD) — Warm luxurious canvas & neutrals
+  whiteCream:   '#DACFBD',
+  cream:        '#DACFBD',
+  bone:         '#DACFBD',    // White Cream primary bg
+  paper:        '#EFE8DC',    // Soft cream card surface
+  chalk:        '#F7F3EB',    // Pure elevated cream surface
+  ink:          '#0D1C1A',    // Very dark rich Qilin charcoal
+  slate:        '#2C261F',    // Dark bronze taupe
+  slate2:       '#594E42',    // Warm muted stone
+  mist:         '#9E907F',    // Muted taupe
+  mist2:        '#C2B4A0',    // Soft cream border
+  hair:         '#C0B19C',    // Refined subtle border
+  hairLight:    'rgba(255,255,255,0.25)',
 
-  // ── Saffron / Amber (warmth, spice, richness) ─────────────────
-  clay:         '#C2781A',    // Warm amber
-  clayDeep:     '#92400E',    // Deep amber / burnished copper
-  amber:        '#D97706',    // Saffron gold
-  amberDeep:    '#B45309',    // Rich saffron
-  saffron:      '#D97706',    // Rich saffron attention color
+  // 3. Golden Days (#BF9861) — Rich gold & warm saffron accent
+  goldenDays:   '#BF9861',
+  amber:        '#BF9861',    // Golden Days
+  amberDeep:    '#9E7538',    // Deep burnished bronze
+  clay:         '#BF9861',    // Warm gold
+  clayDeep:     '#8A5E24',    // Deep warm amber
+  saffron:      '#BF9861',    // Rich Golden Days attention color
+  goldMist:     '#F5EEDB',    // Soft champagne gold mist
 
-  // ── Burgundy / Crimson (sophistication, danger) ───────────────
-  crimson:      '#991B1B',    // Deep burgundy
-  burgundy:     '#991B1B',    // Semantic burgundy for urgent/destructive states
-  crimsonMist:  '#FEE2E2',    // Soft blush
+  // 4. Red Phoenix (#7F1100) — Deep ruby crimson urgency & destruction
+  redPhoenix:   '#7F1100',
+  crimson:      '#7F1100',    // Deep Red Phoenix
+  burgundy:     '#7F1100',    // Deep Red Phoenix
+  crimsonMist:  '#FCE8E6',    // Soft blush phoenix mist
 
   // ── Semantic ──────────────────────────────────────────────────
-  success:      '#166534',    // Deep forest green
-  warning:      '#B45309',    // Rich saffron
-  danger:       '#991B1B',    // Burgundy
+  success:      '#02332D',    // Royal Green Qilin
+  warning:      '#BF9861',    // Golden Days
+  danger:       '#7F1100',    // Red Phoenix
 
-  // ── Dark mode (Warm espresso depths) ─────────────────────────
-  darkBg:       '#0C0A09',    // Espresso black
-  darkSurface:  '#1C1917',    // Warm charcoal
-  darkBorder:   '#292524',    // Subtle warm dark
-  darkText:     '#FAFAF9',    // Warm white
-  darkMist:     '#A8A29E',    // Warm muted
+  // ── Dark mode (Deep espresso & dark Qilin) ────────────────────
+  darkBg:       '#081210',    // Deep dark Qilin black
+  darkSurface:  '#0E201D',    // Deep Qilin emerald surface
+  darkBorder:   '#18332E',    // Subtle Qilin dark border
+  darkText:     '#F7F3EB',    // White Cream text
+  darkMist:     '#9E907F',    // Muted cream taupe
 } as const;
 
 export type Palette = typeof palette;

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import * as Updates from 'expo-updates';
 import { RefreshCw, X, ArrowUpCircle } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess } from '@/lib/haptics';
 import { palette, type, spacing, font } from '@/lib/theme';
 import { useTheme, SurfaceCard, PrimaryAction, IconButton } from './ui';
 import { PressableScale } from './motion';
@@ -39,11 +39,11 @@ export function UpdateBanner() {
   }
 
   const handleApplyUpdate = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticTap();
     setDownloading(true);
     try {
       await Updates.fetchUpdateAsync();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccess();
       await Updates.reloadAsync();
     } catch (e) {
       console.log('Failed to fetch update:', e);

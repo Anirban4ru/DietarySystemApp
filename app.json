@@ -58,7 +58,12 @@
     },
     "owner": "anirban4rus-team",
     "updates": {
-      "url": "https://u.expo.dev/8a00bdd7-d745-48dc-8e1d-affc1834874d"
+      "url": "https://u.expo.dev/8a00bdd7-d745-48dc-8e1d-affc1834874d",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }
