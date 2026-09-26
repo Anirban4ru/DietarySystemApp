@@ -78,6 +78,7 @@ export function PaywallModal({
     activeFeaturePaywall,
     isPaywallOpen,
     closePaywall,
+    restorePurchases,
   } = usePro();
   const toast = useToast();
 
@@ -103,8 +104,6 @@ export function PaywallModal({
     setErrorMessage(null);
 
     try {
-      // Simulate real subscription transaction
-      await new Promise((res) => setTimeout(res, 1400));
       await unlockPro(selectedPlan);
       setState('success');
       hapticSuccess();
@@ -126,8 +125,10 @@ export function PaywallModal({
     setErrorMessage(null);
 
     try {
-      await new Promise((res) => setTimeout(res, 1200));
-      await unlockPro('annual');
+      const restored = await restorePurchases();
+      if (!restored) {
+        throw new Error('No active store subscription found to restore.');
+      }
       setState('success');
       hapticSuccess();
       toast.show('Purchases successfully restored.', 'success');

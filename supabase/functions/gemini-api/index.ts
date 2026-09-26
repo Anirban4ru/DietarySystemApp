@@ -6,24 +6,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple in-memory rate limit: max 20 AI calls per user per hour
-// Resets when the Edge Function instance is recycled (Supabase free tier recycles frequently).
-// For a more persistent limit, use a Supabase table — good enough for a demo.
+// In-memory rate limiter with tier-based thresholds:
+// Free tier: 5 requests / hour | Pro tier: 30 requests / hour
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT = 20;
+const FREE_RATE_LIMIT = 5;
+const PRO_RATE_LIMIT = 30;
 const WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-function checkRateLimit(userId: string): boolean {
+function checkRateLimit(userId: string, limit: number): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(userId);
   if (!entry || now - entry.windowStart > WINDOW_MS) {
     rateLimitMap.set(userId, { count: 1, windowStart: now });
     return true;
   }
-  if (entry.count >= RATE_LIMIT) return false;
+  if (entry.count >= limit) return false;
   entry.count++;
   return true;
 }
+
+// Pro-only actions mapping to Entitlements:
+// canUseAiChef -> generateStrictRecipe
+// canScanReceipts -> parseReceipt
+// canScanCamera -> detectFoodItem
+// canSearchMeals -> searchMealByName, searchMealSuggestions
+const PRO_ONLY_ACTIONS = new Set([
+  'generateStrictRecipe',
+  'parseReceipt',
+  'detectFoodItem',
+  'searchMealByName',
+  'searchMealSuggestions',
+]);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -54,16 +67,49 @@ serve(async (req) => {
       });
     }
 
-    // ── 2. Rate limiting ──────────────────────────────────────────────────
-    if (!checkRateLimit(user.id)) {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 429,
-      });
+    // ── 2. Entitlement & Subscription Verification ────────────────────────
+    const { data: profile } = await supabase
+      .from('user_profile')
+      .select('subscription_tier')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const isPro = profile?.subscription_tier === 'pro';
+
+    // ── 3. Parse action and payload ───────────────────────────────────────
+    const { action, payload } = await req.json();
+
+    // Enforce Pro-only actions server-side
+    if (PRO_ONLY_ACTIONS.has(action) && !isPro) {
+      return new Response(
+        JSON.stringify({
+          error: 'Forbidden: This feature requires an active Nourish Pro subscription.',
+          code: 'PRO_SUBSCRIPTION_REQUIRED',
+          action,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      );
     }
 
-    // ── 3. Process the AI action ──────────────────────────────────────────
-    const { action, payload } = await req.json();
+    // ── 4. Tiered Rate Limiting ───────────────────────────────────────────
+    const limit = isPro ? PRO_RATE_LIMIT : FREE_RATE_LIMIT;
+    if (!checkRateLimit(user.id, limit)) {
+      return new Response(
+        JSON.stringify({
+          error: isPro
+            ? `Pro hourly limit reached (${PRO_RATE_LIMIT} calls/hr). Please try again shortly.`
+            : `Free tier limit reached (${FREE_RATE_LIMIT} calls/hr). Upgrade to Nourish Pro for 30 calls/hr.`,
+          code: 'RATE_LIMIT_EXCEEDED',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429,
+        }
+      );
+    }
     const apiKey = Deno.env.get('GEMINI_API_KEY');
 
     if (!apiKey) {

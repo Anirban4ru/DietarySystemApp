@@ -156,7 +156,7 @@ export default function OnboardingScreen() {
               </View>
               <Text style={styles.headline}>Namaste!</Text>
               <Text style={styles.subline}>
-                Welcome to Nourish. Let's set up your personal health profile.
+                {"Welcome to Nourish. Let's set up your personal health profile."}
               </Text>
               <Text style={styles.bulletItem}>Your data belongs only to you and remains strictly private.</Text>
               <Text style={styles.bulletItem}>Recipes tailored to Indian cuisine and fresh pantry ingredients.</Text>
@@ -167,7 +167,7 @@ export default function OnboardingScreen() {
                 onPress={handleWelcomeNext}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnPrimaryText}>LET'S GET STARTED</Text>
+                <Text style={styles.btnPrimaryText}>{"LET'S GET STARTED"}</Text>
                 <ChevronRight size={18} color={palette.sageDeep} strokeWidth={2.5} />
               </TouchableOpacity>
             </View>

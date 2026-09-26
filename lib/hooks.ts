@@ -63,16 +63,31 @@ export function ProProvider({ children }: { children: ReactNode }) {
   const loadUserProState = async (userId: string | null) => {
     setCurrentUserId(userId);
     if (!userId) {
-      setIsProState(false);
+      const isGuestPro = (await AsyncStorage.getItem('@nourish_is_pro_guest')) === 'true';
+      setIsProState(isGuestPro);
       setScansUsed(0);
       setSubscriptionPlan('none');
       return;
     }
-    const isProVal = await AsyncStorage.getItem(`@nourish_is_pro_${userId}`);
+
+    try {
+      // Check database and local demo state
+      const { data: profile } = await supabase
+        .from('user_profile')
+        .select('subscription_tier')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const isServerPro = profile?.subscription_tier === 'pro';
+      const isLocalPro = (await AsyncStorage.getItem(`@nourish_is_pro_${userId}`)) === 'true';
+      setIsProState(isServerPro || isLocalPro);
+    } catch {
+      const isLocalPro = (await AsyncStorage.getItem(`@nourish_is_pro_${userId}`)) === 'true';
+      setIsProState(isLocalPro);
+    }
+
     const subPlanVal = await AsyncStorage.getItem(`@nourish_sub_plan_${userId}`);
     const scansVal = await AsyncStorage.getItem(`@nourish_scans_used_${userId}`);
-
-    setIsProState(isProVal === 'true');
     setSubscriptionPlan((subPlanVal as 'annual' | 'monthly') || 'none');
     setScansUsed(scansVal ? parseInt(scansVal, 10) || 0 : 0);
   };
@@ -91,39 +106,78 @@ export function ProProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const setIsPro = (val: boolean) => {
+  const setIsPro = async (val: boolean) => {
     setIsProState(val);
+    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
+    await AsyncStorage.setItem(key, val ? 'true' : 'false');
+
+    // Sync to user profile if authenticated
     if (currentUserId) {
-      AsyncStorage.setItem(`@nourish_is_pro_${currentUserId}`, val ? 'true' : 'false');
+      try {
+        await supabase
+          .from('user_profile')
+          .update({ subscription_tier: val ? 'pro' : 'free' })
+          .eq('user_id', currentUserId);
+      } catch {}
     }
   };
 
+  // Demo / In-app Pro unlock (works out of the box without requiring external payment gateway)
   const unlockPro = async (plan: 'annual' | 'monthly' = 'annual') => {
     setIsProState(true);
     setSubscriptionPlan(plan);
+    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
+    const planKey = currentUserId ? `@nourish_sub_plan_${currentUserId}` : '@nourish_sub_plan_guest';
+    await AsyncStorage.setItem(key, 'true');
+    await AsyncStorage.setItem(planKey, plan);
+
     if (currentUserId) {
-      await AsyncStorage.setItem(`@nourish_is_pro_${currentUserId}`, 'true');
-      await AsyncStorage.setItem(`@nourish_sub_plan_${currentUserId}`, plan);
+      try {
+        await supabase
+          .from('user_profile')
+          .update({ subscription_tier: 'pro' })
+          .eq('user_id', currentUserId);
+      } catch {}
     }
   };
 
   const resetPro = async () => {
     setIsProState(false);
     setSubscriptionPlan('none');
+    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
+    const planKey = currentUserId ? `@nourish_sub_plan_${currentUserId}` : '@nourish_sub_plan_guest';
+    await AsyncStorage.setItem(key, 'false');
+    await AsyncStorage.setItem(planKey, 'none');
+
     if (currentUserId) {
-      await AsyncStorage.setItem(`@nourish_is_pro_${currentUserId}`, 'false');
-      await AsyncStorage.setItem(`@nourish_sub_plan_${currentUserId}`, 'none');
+      try {
+        await supabase
+          .from('user_profile')
+          .update({ subscription_tier: 'free' })
+          .eq('user_id', currentUserId);
+      } catch {}
     }
   };
 
   const restorePurchases = async (): Promise<boolean> => {
-    if (!currentUserId) return false;
-    const val = await AsyncStorage.getItem(`@nourish_is_pro_${currentUserId}`);
-    if (val === 'true') {
+    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
+    const isLocalPro = (await AsyncStorage.getItem(key)) === 'true';
+    if (isLocalPro) {
       setIsProState(true);
-      const plan = (await AsyncStorage.getItem(`@nourish_sub_plan_${currentUserId}`)) as 'annual' | 'monthly' | null;
-      setSubscriptionPlan(plan || 'annual');
       return true;
+    }
+    if (currentUserId) {
+      try {
+        const { data } = await supabase
+          .from('user_profile')
+          .select('subscription_tier')
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+        if (data?.subscription_tier === 'pro') {
+          setIsProState(true);
+          return true;
+        }
+      } catch {}
     }
     return false;
   };

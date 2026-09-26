@@ -5,7 +5,8 @@ import {
   ActivityIndicator, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Leaf, Check, ShieldCheck, Heart, User, Lock, Mail, Activity, Eye, EyeOff, X, FileText, Shield } from 'lucide-react-native';
+import * as Linking from 'expo-linking';
+import { Leaf, Check, ShieldCheck, Heart, User, Lock, Mail, Activity, Eye, EyeOff, X, FileText, Shield, KeyRound, ArrowLeft } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { PressScale, useToast } from '@/components/ui';
@@ -23,7 +24,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { show } = useToast();
 
-  const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
+  const [authMode, setAuthMode] = useState<'signup' | 'signin' | 'forgot'>('signup');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -91,6 +92,33 @@ export default function LoginScreen() {
     setLoading(false);
   }
 
+  // Password reset request flow
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      show('Please enter your email address.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const redirectUrl = Linking.createURL('/reset-password');
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        show(error.message, 'error');
+      } else {
+        show('Password recovery link sent! Please check your email.', 'success');
+        setAuthMode('signin');
+      }
+    } catch (e: any) {
+      show(e.message || 'Unable to send password recovery email.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Sign up new user with complete profile details (Zero lag, direct persistence)
   async function handleSignUp() {
     if (!fullName.trim()) {
@@ -101,8 +129,16 @@ export default function LoginScreen() {
       show('Please provide a valid email and password.', 'error');
       return;
     }
-    if (password.length < 6) {
-      show('Password must be at least 6 characters long.', 'error');
+
+    // Task 1.6: Enhanced password policy (min 8 characters + letter and number check)
+    if (password.length < 8) {
+      show('Password must be at least 8 characters long.', 'error');
+      return;
+    }
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (!hasLetter || !hasNumber) {
+      show('Password must contain at least one letter and one number.', 'error');
       return;
     }
 
@@ -198,29 +234,33 @@ export default function LoginScreen() {
           <Text style={styles.brandDescription}>
             {authMode === 'signup'
               ? 'Register with your verified biometrics for clinical precision.'
+              : authMode === 'forgot'
+              ? 'Enter your registered email to receive secure recovery instructions.'
               : 'Sign in to access your culinary intelligence workspace.'}
           </Text>
         </View>
 
         {/* Mode Selector Segmented Switch */}
-        <View style={styles.segmentWrap}>
-          <PressScale
-            onPress={() => setAuthMode('signup')}
-            style={[styles.segmentBtn, authMode === 'signup' && styles.segmentBtnActive]}
-          >
-            <Text style={[styles.segmentText, authMode === 'signup' && styles.segmentTextActive]}>
-              CREATE ACCOUNT
-            </Text>
-          </PressScale>
-          <PressScale
-            onPress={() => setAuthMode('signin')}
-            style={[styles.segmentBtn, authMode === 'signin' && styles.segmentBtnActive]}
-          >
-            <Text style={[styles.segmentText, authMode === 'signin' && styles.segmentTextActive]}>
-              SIGN IN
-            </Text>
-          </PressScale>
-        </View>
+        {authMode !== 'forgot' && (
+          <View style={styles.segmentWrap}>
+            <PressScale
+              onPress={() => setAuthMode('signup')}
+              style={[styles.segmentBtn, authMode === 'signup' && styles.segmentBtnActive]}
+            >
+              <Text style={[styles.segmentText, authMode === 'signup' && styles.segmentTextActive]}>
+                CREATE ACCOUNT
+              </Text>
+            </PressScale>
+            <PressScale
+              onPress={() => setAuthMode('signin')}
+              style={[styles.segmentBtn, authMode === 'signin' && styles.segmentBtnActive]}
+            >
+              <Text style={[styles.segmentText, authMode === 'signin' && styles.segmentTextActive]}>
+                SIGN IN
+              </Text>
+            </PressScale>
+          </View>
+        )}
 
         {/* ── LUXURY FORM CARD (Light Palette & Soft Non-Neon Borders) ── */}
         <View style={styles.formCard}>
@@ -259,7 +299,7 @@ export default function LoginScreen() {
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
                   <Lock size={13} color="#02332D" />
-                  <Text style={styles.fieldLabel}>PASSWORD * (MIN 6 CHARACTERS)</Text>
+                  <Text style={styles.fieldLabel}>PASSWORD * (MIN 8 CHARS, 1 LETTER &amp; 1 NUMBER)</Text>
                 </View>
                 <View style={styles.passwordInputWrap}>
                   <TextInput
@@ -387,6 +427,46 @@ export default function LoginScreen() {
                 )}
               </PressScale>
             </>
+          ) : authMode === 'forgot' ? (
+            <>
+              {/* Forgot Password Recovery Mode */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.labelRow}>
+                  <KeyRound size={13} color="#02332D" />
+                  <Text style={styles.fieldLabel}>RECOVERY EMAIL ADDRESS</Text>
+                </View>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <PressScale
+                onPress={handleForgotPassword}
+                disabled={loading}
+                style={[styles.primaryBtn, { marginTop: spacing[4] }]}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#DACFBD" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>
+                    SEND RECOVERY EMAIL
+                  </Text>
+                )}
+              </PressScale>
+
+              <TouchableOpacity
+                onPress={() => setAuthMode('signin')}
+                style={styles.backToSignInBtn}
+                activeOpacity={0.7}
+              >
+                <ArrowLeft size={14} color="#02332D" />
+                <Text style={styles.backToSignInText}>RETURN TO SIGN IN</Text>
+              </TouchableOpacity>
+            </>
           ) : (
             <>
               {/* Sign In Mode */}
@@ -430,12 +510,21 @@ export default function LoginScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
+
+                {/* Forgot Password Link */}
+                <TouchableOpacity
+                  onPress={() => setAuthMode('forgot')}
+                  style={styles.forgotPasswordBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                </TouchableOpacity>
               </View>
 
               <PressScale
                 onPress={handleSignIn}
                 disabled={loading}
-                style={[styles.primaryBtn, { marginTop: spacing[6] }]}
+                style={[styles.primaryBtn, { marginTop: spacing[4] }]}
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="#DACFBD" />
@@ -924,5 +1013,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#DACFBD',
     letterSpacing: 1.2,
+  },
+  forgotPasswordBtn: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  forgotPasswordText: {
+    fontFamily: font.sansMed,
+    fontSize: 12,
+    color: '#02332D',
+    textDecorationLine: 'underline',
+  },
+  backToSignInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing[4],
+    paddingVertical: 10,
+  },
+  backToSignInText: {
+    fontFamily: font.sansBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    color: '#02332D',
   },
 });
