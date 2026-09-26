@@ -102,6 +102,70 @@ const TEMPLATES: { name: string; base: { name: string; grams: number }[] }[] = [
     { name: 'Pyaaz', grams: 70 }, { name: 'Shimla Mirch', grams: 60 },
     { name: 'Adrak', grams: 10 }, { name: 'Gehu Atta', grams: 120 },
   ]},
+  { name: 'Chana Masala', base: [
+    { name: 'Chana', grams: 160 }, { name: 'Tamatar', grams: 120 },
+    { name: 'Pyaaz', grams: 90 }, { name: 'Lehsun', grams: 15 },
+    { name: 'Adrak', grams: 12 }, { name: 'Hari Mirch', grams: 10 },
+    { name: 'Chawal', grams: 120 },
+  ]},
+  { name: 'Gajar Beetroot Poriyal', base: [
+    { name: 'Gajar', grams: 120 }, { name: 'Beetroot', grams: 120 },
+    { name: 'Curry Leaves', grams: 8 }, { name: 'Hari Mirch', grams: 15 },
+    { name: 'Lemon', grams: 25 }, { name: 'Gehu Atta', grams: 100 },
+  ]},
+  { name: 'Mushroom Kadai', base: [
+    { name: 'Mushroom', grams: 180 }, { name: 'Shimla Mirch', grams: 80 },
+    { name: 'Tamatar', grams: 100 }, { name: 'Pyaaz', grams: 80 },
+    { name: 'Lehsun', grams: 15 }, { name: 'Adrak', grams: 12 },
+    { name: 'Gehu Atta', grams: 120 },
+  ]},
+  { name: 'Tofu Palak Saag', base: [
+    { name: 'Tofu', grams: 160 }, { name: 'Palak', grams: 180 },
+    { name: 'Tamatar', grams: 80 }, { name: 'Pyaaz', grams: 60 },
+    { name: 'Lehsun', grams: 15 }, { name: 'Adrak', grams: 10 },
+    { name: 'Brown Rice', grams: 120 },
+  ]},
+  { name: 'Savory Oats Khichdi', base: [
+    { name: 'Oats', grams: 100 }, { name: 'Moong Dal', grams: 80 },
+    { name: 'Gajar', grams: 60 }, { name: 'Tamatar', grams: 70 },
+    { name: 'Adrak', grams: 10 }, { name: 'Ghee', grams: 15 },
+  ]},
+  { name: 'Suji Upma', base: [
+    { name: 'Suji', grams: 120 }, { name: 'Gajar', grams: 60 },
+    { name: 'Pyaaz', grams: 60 }, { name: 'Hari Mirch', grams: 10 },
+    { name: 'Curry Leaves', grams: 6 }, { name: 'Ghee', grams: 15 },
+  ]},
+  { name: 'Mutton Rogan Josh', base: [
+    { name: 'Mutton', grams: 220 }, { name: 'Pyaaz', grams: 110 },
+    { name: 'Tamatar', grams: 120 }, { name: 'Dahi', grams: 90 },
+    { name: 'Lehsun', grams: 20 }, { name: 'Adrak', grams: 15 },
+    { name: 'Chawal', grams: 130 },
+  ]},
+  { name: 'Mooli Paratha', base: [
+    { name: 'Radish', grams: 150 }, { name: 'Gehu Atta', grams: 140 },
+    { name: 'Hari Mirch', grams: 15 }, { name: 'Adrak', grams: 10 },
+    { name: 'Dahi', grams: 80 }, { name: 'Ghee', grams: 10 },
+  ]},
+  { name: 'Jowar Roti with Shakarkandi Sabzi', base: [
+    { name: 'Jowar Atta', grams: 140 }, { name: 'Shakarkandi', grams: 150 },
+    { name: 'Tamatar', grams: 80 }, { name: 'Pyaaz', grams: 50 },
+    { name: 'Hari Mirch', grams: 15 }, { name: 'Curry Leaves', grams: 5 },
+  ]},
+  { name: 'Curd Rice (Daddojanam)', base: [
+    { name: 'Chawal', grams: 150 }, { name: 'Dahi', grams: 150 },
+    { name: 'Curry Leaves', grams: 8 }, { name: 'Adrak', grams: 10 },
+    { name: 'Hari Mirch', grams: 10 }, { name: 'Ghee', grams: 10 },
+  ]},
+  { name: 'Masala Egg Curry', base: [
+    { name: 'Eggs', grams: 180 }, { name: 'Tamatar', grams: 110 },
+    { name: 'Pyaaz', grams: 90 }, { name: 'Lehsun', grams: 15 },
+    { name: 'Adrak', grams: 12 }, { name: 'Chawal', grams: 130 },
+  ]},
+  { name: 'Sweet Potato & Spinach Hash', base: [
+    { name: 'Shakarkandi', grams: 180 }, { name: 'Spinach', grams: 120 },
+    { name: 'Pyaaz', grams: 60 }, { name: 'Hari Mirch', grams: 15 },
+    { name: 'Lemon', grams: 25 }, { name: 'Ghee', grams: 10 },
+  ]},
 ];
 
 function sumNutrition(ingredients: { name: string; grams: number }[]) {

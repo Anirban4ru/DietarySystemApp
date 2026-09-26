@@ -1,4 +1,4 @@
-import { FoodItem, Condition } from './types';
+import { FoodItem, Condition, DisposalRow, InventoryRow } from './types';
 import { FOOD_BY_NAME } from './foodCatalog';
 
 // Feature 8: Food storage tips per item
@@ -159,3 +159,87 @@ export function expiryTimeline(daysLeft: number): { label: string; tone: 'danger
   if (daysLeft <= 7) return { label: `${daysLeft}d — SOON`, tone: 'warning' };
   return { label: `${daysLeft}d — STABLE`, tone: 'success' };
 }
+
+// Feature 6.2: Waste-pattern-aware shopping suggestions
+export interface WasteAwareShoppingSuggestion {
+  foodName: string;
+  category: string;
+  disposalCount: number;
+  primaryReason: string;
+  advice: string;
+  suggestedAction: 'reduce_qty' | 'freeze_early' | 'buy_smaller_pack' | 'substitute';
+  suggestedSubstitute?: string;
+}
+
+export function computeWasteAwareShoppingSuggestions(
+  disposals: DisposalRow[] = [],
+  pantryItems: InventoryRow[] = []
+): WasteAwareShoppingSuggestion[] {
+  if (!disposals || disposals.length === 0) return [];
+
+  const counts: Record<string, { count: number; category: string; reasons: Record<string, number> }> = {};
+  for (const d of disposals) {
+    const key = (d.item_name || '').trim().toLowerCase();
+    if (!key) continue;
+    if (!counts[key]) {
+      counts[key] = { count: 0, category: d.category || 'other', reasons: {} };
+    }
+    counts[key].count += 1;
+    const r = d.reason || 'expired';
+    counts[key].reasons[r] = (counts[key].reasons[r] || 0) + 1;
+  }
+
+  const suggestions: WasteAwareShoppingSuggestion[] = [];
+
+  for (const [name, data] of Object.entries(counts)) {
+    if (data.count < 1) continue;
+
+    const catalogItem = FOOD_BY_NAME[name];
+    const substitute = catalogItem?.substitute;
+    const fragility = catalogItem?.fragility ?? 0.5;
+
+    let topReason = 'expired';
+    let maxReasonCount = 0;
+    for (const [r, count] of Object.entries(data.reasons)) {
+      if (count > maxReasonCount) {
+        maxReasonCount = count;
+        topReason = r;
+      }
+    }
+
+    const inPantry = pantryItems.find((p) => p.name.toLowerCase() === name);
+
+    let advice = '';
+    let action: WasteAwareShoppingSuggestion['suggestedAction'] = 'reduce_qty';
+
+    if (inPantry && inPantry.quantity > 0) {
+      advice = `Already have ${inPantry.quantity} ${inPantry.unit} in pantry. Consume existing supply first.`;
+      action = 'reduce_qty';
+    } else if (topReason === 'overpurchased') {
+      advice = `Discarded ${data.count}x due to over-purchasing. Recommend single-meal packs.`;
+      action = 'buy_smaller_pack';
+    } else if (fragility > 0.7) {
+      advice = `High perishability (${catalogItem?.shelfLifeDays ?? 4}d max). Discarded ${data.count}x. Buy 50% smaller portions or freeze immediately.`;
+      action = 'freeze_early';
+    } else if (substitute) {
+      advice = `Frequently discarded. Consider longer shelf-life substitute: ${substitute}.`;
+      action = 'substitute';
+    } else {
+      advice = `Discarded ${data.count}x recently (${topReason}). Plan recipes prior to buying.`;
+      action = 'reduce_qty';
+    }
+
+    suggestions.push({
+      foodName: catalogItem?.name ?? (name.charAt(0).toUpperCase() + name.slice(1)),
+      category: data.category,
+      disposalCount: data.count,
+      primaryReason: topReason,
+      advice,
+      suggestedAction: action,
+      suggestedSubstitute: substitute,
+    });
+  }
+
+  return suggestions.sort((a, b) => b.disposalCount - a.disposalCount);
+}
+

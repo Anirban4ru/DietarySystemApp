@@ -21,6 +21,7 @@ import {
   Search,
   CheckCircle2,
   Layers,
+  Lightbulb,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hapticTap, hapticSuccess, hapticWarning, hapticSelection } from '@/lib/haptics';
@@ -38,16 +39,24 @@ import {
   SkeletonCard,
 } from '@/components/ui';
 import { PressableScale } from '@/components/motion';
-import { useShoppingList } from '@/lib/hooks';
+import { useShoppingList, useDisposals, useInventory } from '@/lib/hooks';
 import { searchGroceryItems } from '@/lib/ai';
 import { CATEGORY_LABELS } from '@/lib/foodCatalog';
+import { computeWasteAwareShoppingSuggestions } from '@/lib/features';
 
 export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { items, loading, addItems, toggleCheck, remove, clearChecked } = useShoppingList();
+  const { disposals } = useDisposals();
+  const { items: pantryItems } = useInventory();
   const [addModal, setAddModal] = useState(false);
+
+  const wasteSuggestions = useMemo(
+    () => computeWasteAwareShoppingSuggestions(disposals, pantryItems).slice(0, 3),
+    [disposals, pantryItems]
+  );
 
   const unchecked = useMemo(() => items.filter((i) => !i.checked), [items]);
   const checked = useMemo(() => items.filter((i) => i.checked), [items]);
@@ -134,6 +143,51 @@ export function ShoppingView({ embedded = false }: { embedded?: boolean }) {
                   },
                 ]}
               />
+            </View>
+          </SurfaceCard>
+        )}
+
+        {/* ── Waste Prevention Smart Suggestions ── */}
+        {wasteSuggestions.length > 0 && (
+          <SurfaceCard
+            style={{
+              marginBottom: spacing[3],
+              backgroundColor: mode === 'dark' ? palette.darkSurface : palette.goldMist,
+              borderColor: palette.amber,
+              borderWidth: 1.5,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <Lightbulb size={16} color={palette.amberDeep} strokeWidth={2.5} />
+              <Text style={[type.labelSm, { color: palette.amberDeep, letterSpacing: 0.8 }]}>
+                SMART WASTE PREVENTION
+              </Text>
+            </View>
+            <View style={{ gap: 10 }}>
+              {wasteSuggestions.map((sug, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: palette.amberDeep,
+                      marginTop: 6,
+                    }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.bodySm, { color: colors.text, fontWeight: '700' }]}>
+                      {sug.foodName}
+                      <Text style={{ fontWeight: '400', color: colors.subText }}>
+                        {' '}({sug.disposalCount}x discarded)
+                      </Text>
+                    </Text>
+                    <Text style={[type.bodySm, { fontSize: 12, color: colors.subText, marginTop: 2, lineHeight: 16 }]}>
+                      {sug.advice}
+                    </Text>
+                  </View>
+                </View>
+              ))}
             </View>
           </SurfaceCard>
         )}

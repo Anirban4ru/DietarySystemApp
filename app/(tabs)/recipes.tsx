@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from '
 import { MealPlanView } from './plan';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Animated, Easing, InteractionManager,
+  Modal, Animated, Easing, InteractionManager, FlatList,
 } from 'react-native';
 import {
   Leaf, Check, AlertCircle, ChefHat, Heart,
@@ -211,126 +211,133 @@ export default function RecipesScreen() {
       {mainTab === 'plan' ? (
         <MealPlanView embedded={true} />
       ) : (
-        <ScrollView
-          style={[styles.container, { backgroundColor: colors.bg }]}
-          contentContainerStyle={{ paddingBottom: 120, paddingTop: 6 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text style={[styles.screenTitle, { color: colors.text }]}>Recipes</Text>
-            <Text style={[styles.screenSub, { color: colors.subText }]}>
-              {viewMode === 'pantry' ? `${recipes.length} meals from your pantry` : `${vaultRecipes.length} saved recipes`}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <BrutalButton variant={viewMode === 'pantry' ? 'sage' : 'dark'} onPress={() => setViewMode('pantry')} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
-              PANTRY
-            </BrutalButton>
-            <BrutalButton variant={viewMode === 'vault' ? 'sage' : 'dark'} onPress={() => setViewMode('vault')} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
-              VAULT
-            </BrutalButton>
-          </View>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={viewMode === 'pantry' ? recipes : vaultRecipes}
+            keyExtractor={(c) => c.name}
+            style={[styles.container, { backgroundColor: colors.bg }]}
+            contentContainerStyle={{ paddingBottom: 120, paddingTop: 6 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            renderItem={({ item: c, index: i }) => (
+              <RecipeCard
+                key={c.name}
+                c={c}
+                index={i}
+                selected={selected === c.name}
+                isFav={favs.includes(c.name)}
+                onCook={() => cook(c)}
+                onFav={() => handleFav(c.name)}
+                onShop={() => addToShopping(c)}
+                onDetail={() => handleDetail(c)}
+                colors={colors}
+                mode={mode}
+              />
+            )}
+            ListHeaderComponent={
+              <View>
+                {/* Header */}
+                <View style={styles.header}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View>
+                      <Text style={[styles.screenTitle, { color: colors.text }]}>Recipes</Text>
+                      <Text style={[styles.screenSub, { color: colors.subText }]}>
+                        {viewMode === 'pantry' ? `${recipes.length} meals from your pantry` : `${vaultRecipes.length} saved recipes`}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <BrutalButton variant={viewMode === 'pantry' ? 'sage' : 'dark'} onPress={() => setViewMode('pantry')} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+                        PANTRY
+                      </BrutalButton>
+                      <BrutalButton variant={viewMode === 'vault' ? 'sage' : 'dark'} onPress={() => setViewMode('vault')} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+                        VAULT
+                      </BrutalButton>
+                    </View>
+                  </View>
+                </View>
+
+                {/* What matters most — compact pill selector (only in pantry mode) */}
+                {viewMode === 'pantry' && (
+                  <View style={[styles.priorityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={styles.controls}>
+                      <SliderCtrl label="Prioritise Expiry" val={weights.waste} setVal={(v: number) => setWeights(w => ({ ...w, waste: v }))} color={palette.danger} colors={colors} />
+                      <SliderCtrl label="Prioritise Nutrition" val={weights.rda} setVal={(v: number) => setWeights(w => ({ ...w, rda: v }))} color={palette.sageDeep} colors={colors} />
+                    </View>
+
+                    {/* AI buttons */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing[3] }}>
+                      <PressScale onPress={handleStrictAI} disabled={aiLoading || items.length === 0} style={{ flex: 1 }}>
+                        <View style={[
+                          styles.aiBtn,
+                          {
+                            backgroundColor: aiLoading || items.length === 0 ? colors.border : palette.ink,
+                            opacity: items.length === 0 ? 0.5 : 1,
+                          },
+                        ]}>
+                          {aiLoading ? <Loader /> : <ChefHat size={15} color={palette.chalk} strokeWidth={2.2} />}
+                          <Text style={[styles.aiBtnText, { color: palette.chalk, fontSize: 12 }]}>
+                            {aiLoading ? 'Synthesizing...' : 'Pantry AI'}
+                          </Text>
+                        </View>
+                      </PressScale>
+                      
+                      <PressScale onPress={handleRoulette} disabled={rouletteLoading || items.length === 0} style={{ flex: 1 }}>
+                        <View style={[
+                          styles.aiBtn,
+                          {
+                            backgroundColor: rouletteLoading || items.length === 0 ? colors.border : palette.sageDeep,
+                            opacity: items.length === 0 ? 0.5 : 1,
+                          },
+                        ]}>
+                          {rouletteLoading ? <Loader /> : <Dice5 size={15} color={palette.chalk} strokeWidth={2.5} />}
+                          <Text style={[styles.aiBtnText, { color: palette.chalk, fontSize: 12 }]}>
+                            {rouletteLoading ? 'Spinning...' : 'Roulette'}
+                          </Text>
+                        </View>
+                      </PressScale>
+                    </View>
+                  </View>
+                )}
+
+                {/* Loading skeleton */}
+                {viewMode === 'pantry' && invLoading && (
+                  <View style={{ gap: spacing[3], marginTop: 12 }}>
+                    <SkeletonCard height={140} />
+                    <SkeletonCard height={140} />
+                    <SkeletonCard height={140} />
+                  </View>
+                )}
+              </View>
+            }
+            ListEmptyComponent={
+              <View>
+                {viewMode === 'pantry' && !invLoading && items.length === 0 && (
+                  <EmptyState 
+                    icon={ChefHat} 
+                    title="Add Food to Your Pantry" 
+                    message="Once you add or scan ingredients, delicious personalized recipes appear here automatically."
+                    actionLabel="Scan Groceries"
+                    onAction={() => router.push('/scan')}
+                  />
+                )}
+                {viewMode === 'vault' && vaultRecipes.length === 0 && (
+                  <EmptyState 
+                    icon={Star} 
+                    title="Recipe Vault is Empty" 
+                    message="Save your favorite generated and rescue recipes here so you can cook them anytime."
+                    actionLabel="Discover Recipes"
+                    onAction={() => setViewMode('pantry')}
+                  />
+                )}
+              </View>
+            }
+          />
+          <RecipeDetail c={detail} onClose={() => setDetail(null)} onCook={cook} onShop={addToShopping} colors={colors} />
         </View>
-      </View>
-
-      {/* What matters most — compact pill selector (only in pantry mode) */}
-      {viewMode === 'pantry' && (
-      <View style={[styles.priorityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.controls}>
-          <SliderCtrl label="Prioritise Expiry" val={weights.waste} setVal={(v: number) => setWeights(w => ({ ...w, waste: v }))} color={palette.danger} colors={colors} />
-          <SliderCtrl label="Prioritise Nutrition" val={weights.rda} setVal={(v: number) => setWeights(w => ({ ...w, rda: v }))} color={palette.sageDeep} colors={colors} />
-        </View>
-
-        {/* AI buttons */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing[3] }}>
-          <PressScale onPress={handleStrictAI} disabled={aiLoading || items.length === 0} style={{ flex: 1 }}>
-            <View style={[
-              styles.aiBtn,
-              {
-                backgroundColor: aiLoading || items.length === 0 ? colors.border : palette.ink,
-                opacity: items.length === 0 ? 0.5 : 1,
-              },
-            ]}>
-              {aiLoading ? <Loader /> : <ChefHat size={15} color={palette.chalk} strokeWidth={2.2} />}
-              <Text style={[styles.aiBtnText, { color: palette.chalk, fontSize: 12 }]}>
-                {aiLoading ? 'Synthesizing...' : 'Pantry AI'}
-              </Text>
-            </View>
-          </PressScale>
-          
-          <PressScale onPress={handleRoulette} disabled={rouletteLoading || items.length === 0} style={{ flex: 1 }}>
-            <View style={[
-              styles.aiBtn,
-              {
-                backgroundColor: rouletteLoading || items.length === 0 ? colors.border : palette.sageDeep,
-                opacity: items.length === 0 ? 0.5 : 1,
-              },
-            ]}>
-              {rouletteLoading ? <Loader /> : <Dice5 size={15} color={palette.chalk} strokeWidth={2.5} />}
-              <Text style={[styles.aiBtnText, { color: palette.chalk, fontSize: 12 }]}>
-                {rouletteLoading ? 'Spinning...' : 'Roulette'}
-              </Text>
-            </View>
-          </PressScale>
-        </View>
-      </View>
       )}
-
-      {/* Loading skeleton */}
-      {viewMode === 'pantry' && invLoading && (
-        <View style={{ gap: spacing[3], marginTop: 12 }}>
-          <SkeletonCard height={140} />
-          <SkeletonCard height={140} />
-          <SkeletonCard height={140} />
-        </View>
-      )}
-
-      {/* Empty pantry state */}
-      {viewMode === 'pantry' && !invLoading && items.length === 0 && (
-        <EmptyState 
-          icon={ChefHat} 
-          title="Add Food to Your Pantry" 
-          message="Once you add or scan ingredients, delicious personalized recipes appear here automatically."
-          actionLabel="Scan Groceries"
-          onAction={() => router.push('/scan')}
-        />
-      )}
-
-      {/* Empty vault state */}
-      {viewMode === 'vault' && vaultRecipes.length === 0 && (
-        <EmptyState 
-          icon={Star} 
-          title="Recipe Vault is Empty" 
-          message="Save your favorite generated and rescue recipes here so you can cook them anytime."
-          actionLabel="Discover Recipes"
-          onAction={() => setViewMode('pantry')}
-        />
-      )}
-
-      {/* Recipe cards */}
-      {(viewMode === 'pantry' ? recipes : vaultRecipes).map((c, i) => (
-        <RecipeCard
-          key={c.name}
-          c={c}
-          index={i}
-          selected={selected === c.name}
-          isFav={favs.includes(c.name)}
-          onCook={() => cook(c)}
-          onFav={() => handleFav(c.name)}
-          onShop={() => addToShopping(c)}
-          onDetail={() => handleDetail(c)}
-          colors={colors}
-          mode={mode}
-        />
-      ))}
-
-      <RecipeDetail c={detail} onClose={() => setDetail(null)} onCook={cook} onShop={addToShopping} colors={colors} />
-    </ScrollView>
-    )}
     </View>
   );
 }

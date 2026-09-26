@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView,
-  TextInput, Dimensions, ActivityIndicator,
+  TextInput, Dimensions, ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
 import {
   ScanLine, Check, Zap, Sun, Moon, ChevronDown, ChevronUp,
   Barcode, Wand2, X, RefreshCw, AlertCircle, Plus, Minus,
@@ -167,8 +168,15 @@ export default function ScannerScreen() {
       let photoBase64: string | null = null;
       if (cameraRef.current) {
         try {
-          const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.2, skipProcessing: true });
-          photoBase64 = photo?.base64 ?? null;
+          const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+          if (photo?.uri) {
+            const manipulated = await ImageManipulator.manipulateAsync(
+              photo.uri,
+              [{ resize: { width: 1024 } }],
+              { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+            );
+            photoBase64 = manipulated.base64 ?? null;
+          }
         } catch (camErr) {
           console.warn('Hardware camera capture failed, using fallback:', camErr);
         }
@@ -361,7 +369,11 @@ export default function ScannerScreen() {
       </View>
 
       {/* ── BOTTOM HUD CONTROLLER ── */}
-      <View style={[styles.hud, { paddingBottom: Math.max(insets.bottom, 24), backgroundColor: isDark ? '#141210' : '#FFFFFF' }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+        style={[styles.hud, { paddingBottom: Math.max(insets.bottom, 24), backgroundColor: isDark ? '#141210' : '#FFFFFF' }]}
+      >
         {/* Status Line */}
         <Text style={[type.bodySm, { color: colors.subText, textAlign: 'center', marginBottom: 12 }]}>
           {scanProgressText}
@@ -537,7 +549,7 @@ export default function ScannerScreen() {
             />
           </View>
         )}
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }

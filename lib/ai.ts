@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { FOOD_BY_NAME, FOOD_CATALOG } from './foodCatalog';
 import {
   validateAI,
   RecipeSchema,
@@ -102,3 +103,52 @@ export async function detectFoodItem(
   const raw = await invokeGemini('detectFoodItem', { base64Image });
   return validateAI(DetectedFoodSchema, raw);
 }
+
+/**
+ * On-Device Freshness Inference
+ * Uses the Nutritional Decay Scale (NDS) based on food category, shelf life,
+ * and micronutrient fragility to infer freshness (0.0 to 1.0) offline without API latency.
+ */
+export function inferFreshnessOnDevice(
+  foodName: string,
+  daysSinceAdded: number = 0
+): {
+  freshness: number;
+  confidence: number;
+  shelfLifeDays: number;
+  category: string;
+} {
+  const normalized = (foodName || '').trim().toLowerCase();
+
+  let item = FOOD_BY_NAME[normalized];
+  let confidence = 0.95;
+
+  if (!item) {
+    const found = FOOD_CATALOG.find((f) =>
+      f.name.toLowerCase().includes(normalized) || normalized.includes(f.name.toLowerCase())
+    );
+    if (found) {
+      item = found;
+      confidence = 0.85;
+    } else {
+      confidence = 0.55;
+    }
+  }
+
+  const shelfLifeDays = item ? item.shelfLifeDays : 7;
+  const fragility = item ? item.fragility : 0.5;
+  const category = item ? item.category : 'other';
+
+  const elapsed = Math.max(0, daysSinceAdded);
+  const remainingRatio = Math.max(0, (shelfLifeDays - elapsed) / shelfLifeDays);
+  const decayCurve = Math.pow(remainingRatio, 1 + fragility * 0.4);
+  const freshness = Math.max(0.05, Math.min(1.0, Math.round(decayCurve * 100) / 100));
+
+  return {
+    freshness,
+    confidence,
+    shelfLifeDays,
+    category,
+  };
+}
+

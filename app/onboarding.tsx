@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Animated, Dimensions, Platform, Alert,
+  ScrollView, Animated, Dimensions, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Check, ChevronRight, User, Target, Leaf, Heart } from 'lucide-react-native';
@@ -143,12 +143,16 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           {step === 'welcome' && (
             <View style={styles.stepContent}>
               <View style={styles.iconCircle}>
@@ -341,8 +345,9 @@ export default function OnboardingScreen() {
           )}
         </ScrollView>
       </Animated.View>
-    </View>
-  );
+    </KeyboardAvoidingView>
+  </View>
+);
 }
 
 const styles = StyleSheet.create({

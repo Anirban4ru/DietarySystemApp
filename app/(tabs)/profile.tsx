@@ -10,6 +10,7 @@ import {
   Platform,
   Switch,
   Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {
   User,
@@ -59,6 +60,7 @@ import {
 import { PressableScale } from '@/components/motion';
 import { PaywallModal } from '@/components/PaywallModal';
 import { NotificationPreferencesCard } from '@/components/NotificationPreferences';
+import { HouseholdSharingCard } from '@/components/HouseholdCard';
 import { useProfile, useInventory, useImpact, usePro } from '@/lib/hooks';
 import { computeRDA, computeTDEE, bmi, bmiCategory, CONDITION_LABELS } from '@/lib/rda';
 import { Condition } from '@/lib/types';
@@ -260,7 +262,10 @@ export default function ProfileScreen() {
   const isDark = mode === 'dark';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.container, { backgroundColor: colors.bg }]}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{
@@ -268,8 +273,8 @@ export default function ProfileScreen() {
           paddingTop: insets.top + 8,
           paddingHorizontal: spacing[4],
         }}
-        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <AppHeader
           title="Account & Wellness"
@@ -810,6 +815,11 @@ export default function ProfileScreen() {
           <NotificationPreferencesCard />
         </View>
 
+        {/* ── Household Pantry Sharing Card ── */}
+        <View style={{ marginVertical: spacing[2] }}>
+          <HouseholdSharingCard />
+        </View>
+
         {/* ── Data & Privacy Settings ── */}
         <SurfaceCard style={styles.sectionCard}>
           <Text style={[styles.sectionHeading, { color: colors.text }]}>Data & Security</Text>
@@ -977,7 +987,7 @@ export default function ProfileScreen() {
 
       {/* Paywall Modal */}
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useCallback, createContext, useContext, ReactNode, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import * as Crypto from 'expo-crypto';
 import { supabase } from './supabase';
 import { InventoryRow, ProfileRow, ImpactLogRow, DisposalRow, FoodCategory, Condition } from './types';
 import { FOOD_BY_NAME } from './foodCatalog';
@@ -291,7 +292,7 @@ export function useInventory() {
     const expires = new Date(Date.now() + shelf * 86400000).toISOString();
     
     // OPTIMISTIC UPDATE
-    const tempId = 'item-' + Math.random().toString(36).substr(2, 9);
+    const tempId = 'item-' + Crypto.randomUUID();
     const tempRow: InventoryRow = {
       id: tempId, name: input.name, category, added_at: new Date().toISOString(),
       quantity: input.quantity ?? 1, unit: input.unit ?? 'unit',
@@ -510,21 +511,20 @@ export function useImpact() {
       .from('impact_log')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     setLog((data as ImpactLogRow[]) ?? []);
     setLoading(false);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const logEvent = useCallback(async (event_type: ImpactLogRow['event_type'], co2e_kg: number, payload: Record<string, any>) => {
     const { data: { user } } = await supabase.auth.getUser();
     const newEntry: ImpactLogRow = {
-      id: 'impact-' + Math.random().toString(36).substr(2, 9),
+      id: 'impact-' + Crypto.randomUUID(),
       event_type,
       co2e_kg: +co2e_kg.toFixed(2),
       payload,
@@ -572,21 +572,20 @@ export function useDisposals() {
       .from('disposal_events')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     setDisposals((data as DisposalRow[]) ?? []);
     setLoading(false);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const logDisposal = useCallback(async (item_name: string, category: FoodCategory, reason: DisposalRow['reason']) => {
     const { data: { user } } = await supabase.auth.getUser();
     const newEntry: DisposalRow = {
-      id: 'disp-' + Math.random().toString(36).substr(2, 9),
+      id: 'disp-' + Crypto.randomUUID(),
       item_name,
       category,
       reason,
@@ -724,7 +723,7 @@ export function useShoppingList() {
     
     if (!user) {
       const generated: ShoppingItem[] = newItems.map((n) => ({
-        id: 'shop-' + Math.random().toString(36).substr(2, 9),
+        id: 'shop-' + Crypto.randomUUID(),
         item_name: n.item_name,
         category: n.category,
         quantity: n.quantity,
@@ -869,7 +868,7 @@ export function useMealPlan() {
     const today = new Date();
     today.setDate(today.getDate() + day_of_week);
     const dateStr = today.toISOString().slice(0, 10);
-    const tempId = 'plan-' + Math.random().toString(36).substr(2, 9);
+    const tempId = 'plan-' + Crypto.randomUUID();
     const tempEntry: MealPlanEntry = {
       id: tempId,
       day_of_week,
@@ -1043,6 +1042,151 @@ export function useXp() {
   }, []);
 
   return { xp, loading, addXp };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HOUSEHOLD PANTRY SHARING (Feature 6.1)
+// ─────────────────────────────────────────────────────────────────
+
+export interface HouseholdData {
+  id: string;
+  name: string;
+  invite_code: string;
+  created_by: string;
+  created_at: string;
+  members_count: number;
+}
+
+export function useHousehold() {
+  const [household, setHousehold] = useState<HouseholdData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setHousehold(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Find household membership
+      const { data: membership } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const householdId = membership?.household_id;
+
+      if (!householdId) {
+        // Check if user is creator of any household
+        const { data: created } = await supabase
+          .from('households')
+          .select('*')
+          .eq('created_by', user.id)
+          .maybeSingle();
+
+        if (created) {
+          const { count } = await supabase
+            .from('household_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('household_id', created.id);
+
+          setHousehold({ ...created, members_count: (count ?? 0) + 1 });
+        } else {
+          setHousehold(null);
+        }
+      } else {
+        const { data: house } = await supabase
+          .from('households')
+          .select('*')
+          .eq('id', householdId)
+          .maybeSingle();
+
+        if (house) {
+          const { count } = await supabase
+            .from('household_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('household_id', house.id);
+
+          setHousehold({ ...house, members_count: (count ?? 0) + 1 });
+        }
+      }
+    } catch (e) {
+      console.warn('Household load error:', e);
+      setHousehold(null);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const createHousehold = useCallback(async (name: string): Promise<{ success: boolean; error?: string }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sign in required' };
+
+    const inviteCode = 'NOURISH-' + Crypto.randomUUID().substring(0, 6).toUpperCase();
+    const { data, error } = await supabase
+      .from('households')
+      .insert({ name, invite_code: inviteCode, created_by: user.id })
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+
+    await supabase.from('household_members').insert({
+      household_id: data.id,
+      user_id: user.id,
+      role: 'owner',
+    });
+
+    setHousehold({ ...data, members_count: 1 });
+    return { success: true };
+  }, []);
+
+  const joinHousehold = useCallback(async (inviteCode: string): Promise<{ success: boolean; error?: string }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sign in required' };
+
+    const { data: house, error: findError } = await supabase
+      .from('households')
+      .select('*')
+      .eq('invite_code', inviteCode.trim().toUpperCase())
+      .single();
+
+    if (findError || !house) return { success: false, error: 'Invalid invite code' };
+
+    const { error: joinError } = await supabase.from('household_members').insert({
+      household_id: house.id,
+      user_id: user.id,
+      role: 'member',
+    });
+
+    if (joinError) return { success: false, error: joinError.message };
+
+    load();
+    return { success: true };
+  }, [load]);
+
+  const leaveHousehold = useCallback(async (): Promise<{ success: boolean }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !household) return { success: false };
+
+    await supabase
+      .from('household_members')
+      .delete()
+      .eq('household_id', household.id)
+      .eq('user_id', user.id);
+
+    setHousehold(null);
+    return { success: true };
+  }, [household]);
+
+  return { household, loading, createHousehold, joinHousehold, leaveHousehold, reload: load };
 }
 
 

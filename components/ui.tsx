@@ -753,7 +753,12 @@ export function FreshnessBadge({ daysLeft }: { daysLeft: number }) {
     palette.sageDeep;
 
   return (
-    <View style={[styles.badgeBase, { backgroundColor: bg }]}>
+    <View
+      style={[styles.badgeBase, { backgroundColor: bg }]}
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel={`Freshness status: ${label}`}
+    >
       <Text style={[type.monoBold, { color: fg, fontSize: 10 }]}>{label}</Text>
     </View>
   );
@@ -792,7 +797,12 @@ export function StatusBadge({
   const fSize = size === 'sm' ? 9 : 10;
 
   return (
-    <View style={[styles.badgeBase, { backgroundColor: bg, paddingHorizontal: padH, paddingVertical: padV }]}>
+    <View
+      style={[styles.badgeBase, { backgroundColor: bg, paddingHorizontal: padH, paddingVertical: padV }]}
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel={label}
+    >
       {renderIcon(Icon, { size: size === 'sm' ? 10 : 12, color: fg, strokeWidth: 2.4, style: { marginRight: 4 } })}
       <Text style={[type.monoBold, { color: fg, fontSize: fSize }]}>{label}</Text>
     </View>
@@ -1119,6 +1129,8 @@ export function BrutalButton({
     <PressableScale
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={typeof children === 'string' ? children : undefined}
       style={[{
         backgroundColor: disabled ? palette.mist2 : bg,
         borderRadius: 14,

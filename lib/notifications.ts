@@ -26,7 +26,15 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   milestones: true,
 };
 
-const STORAGE_KEY = '@nourish_notification_preferences';
+async function getStorageKey(): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      return `@nourish_notification_preferences_${user.id}`;
+    }
+  } catch {}
+  return '@nourish_notification_preferences_guest';
+}
 
 // Configure foreground display behavior
 Notifications.setNotificationHandler({
@@ -45,7 +53,8 @@ Notifications.setNotificationHandler({
 
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const key = await getStorageKey();
+    const raw = await AsyncStorage.getItem(key);
     if (!raw) return DEFAULT_NOTIFICATION_PREFERENCES;
     return { ...DEFAULT_NOTIFICATION_PREFERENCES, ...JSON.parse(raw) };
   } catch {
@@ -57,9 +66,10 @@ export async function saveNotificationPreferences(
   prefs: Partial<NotificationPreferences>
 ): Promise<NotificationPreferences> {
   try {
+    const key = await getStorageKey();
     const current = await getNotificationPreferences();
     const updated = { ...current, ...prefs };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(key, JSON.stringify(updated));
     // Synchronize scheduled notifications with new preferences
     await syncScheduledNotifications(updated);
     return updated;

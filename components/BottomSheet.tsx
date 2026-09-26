@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { View, StyleSheet, Modal, TouchableWithoutFeedback, Dimensions } from 'react-native';
+import { useEffect, useCallback } from 'react';
+import { View, StyleSheet, Modal, TouchableWithoutFeedback, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -25,14 +25,14 @@ export function BottomSheet({ children, visible, onClose }: BottomSheetProps) {
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const context = useSharedValue({ y: 0 });
 
-  const scrollTo = (destination: number) => {
+  const scrollTo = useCallback((destination: number) => {
     'worklet';
     translateY.value = withSpring(destination, { damping: 20, stiffness: 150 }, () => {
       if (destination === SCREEN_HEIGHT) {
         runOnJS(onClose)();
       }
     });
-  };
+  }, [onClose, translateY]);
 
   useEffect(() => {
     if (visible) {
@@ -41,7 +41,7 @@ export function BottomSheet({ children, visible, onClose }: BottomSheetProps) {
       // Allow parent to unmount/close manually
       scrollTo(SCREEN_HEIGHT);
     }
-  }, [visible]);
+  }, [visible, scrollTo, translateY]);
 
   const panGesture = Gesture.Pan()
     .onStart(() => {
@@ -81,12 +81,18 @@ export function BottomSheet({ children, visible, onClose }: BottomSheetProps) {
         <Animated.View style={[styles.backdrop, rBackdropStyle]} />
       </TouchableWithoutFeedback>
       
-      <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.bottomSheetContainer, { backgroundColor: colors.bg }, rBottomSheetStyle]}>
-          <View style={styles.line} />
-          {children}
-        </Animated.View>
-      </GestureDetector>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardAvoid}
+        pointerEvents="box-none"
+      >
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={[styles.bottomSheetContainer, { backgroundColor: colors.bg }, rBottomSheetStyle]}>
+            <View style={styles.line} />
+            {children}
+          </Animated.View>
+        </GestureDetector>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -96,9 +102,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
+  keyboardAvoid: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   bottomSheetContainer: {
-    position: 'absolute',
-    bottom: 0,
     width: '100%',
     maxHeight: '90%',
     borderTopLeftRadius: 24,

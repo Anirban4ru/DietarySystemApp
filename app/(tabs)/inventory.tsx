@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
-  ScrollView, Animated, ActivityIndicator, Alert,
+  ScrollView, Animated, ActivityIndicator, Alert, SectionList,
+  Platform, KeyboardAvoidingView,
 } from 'react-native';
 import {
   Plus, AlertTriangle, X, Check, Trash2, Filter,
@@ -76,10 +77,47 @@ export default function InventoryScreen() {
     });
   }, [items, searchQuery, selectedCategory]);
 
-  // Grouped by Urgency
   const todayItems = useMemo(() => filteredItems.filter((i) => getUrgencyGroup(i) === 'today'), [filteredItems]);
   const weekItems = useMemo(() => filteredItems.filter((i) => getUrgencyGroup(i) === 'week'), [filteredItems]);
   const stableItems = useMemo(() => filteredItems.filter((i) => getUrgencyGroup(i) === 'stable'), [filteredItems]);
+
+  const sections = useMemo(() => {
+    const list: {
+      title: string;
+      color: string;
+      badgeBg: string;
+      textColor: string;
+      data: InventoryRow[];
+    }[] = [];
+    if (todayItems.length > 0) {
+      list.push({
+        title: 'Use Today / Tomorrow',
+        color: palette.crimson,
+        badgeBg: palette.crimsonMist,
+        textColor: palette.crimson,
+        data: todayItems,
+      });
+    }
+    if (weekItems.length > 0) {
+      list.push({
+        title: 'Use This Week',
+        color: palette.amberDeep,
+        badgeBg: palette.goldMist,
+        textColor: palette.amberDeep,
+        data: weekItems,
+      });
+    }
+    if (stableItems.length > 0) {
+      list.push({
+        title: 'Stable & Shelf-Safe',
+        color: palette.sageDeep,
+        badgeBg: palette.sageMist,
+        textColor: palette.sageDeep,
+        data: stableItems,
+      });
+    }
+    return list;
+  }, [todayItems, weekItems, stableItems]);
 
   const urgentTotal = items.filter((i) => daysLeft(i.expires_at) <= 3).length;
 
@@ -221,7 +259,9 @@ export default function InventoryScreen() {
       {activeSegment === 'grocery' ? (
         <ShoppingView embedded={true} />
       ) : (
-        <ScrollView
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
           style={styles.scroll}
           contentContainerStyle={{
             paddingBottom: insets.bottom + 100,
@@ -230,181 +270,130 @@ export default function InventoryScreen() {
           }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-        >
-          {/* Header & Subtitle */}
-          <View style={styles.titleRow}>
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          renderItem={({ item }) => (
+            <PantryItemCard
+              key={item.id}
+              item={item}
+              onConsume={() => handleConsume(item)}
+              onFreeze={() => handleFreeze(item)}
+              onDonate={() => handleDonate(item)}
+              onDiscard={() => handleDiscard(item)}
+              onTip={() => openStorageTip(item)}
+              onRescue={() => router.push('/(tabs)/recipes')}
+            />
+          )}
+          renderSectionHeader={({ section }) => (
+            <View style={[styles.sectionHeader, { backgroundColor: colors.bg, paddingTop: 16, paddingBottom: 8 }]}>
+              <View style={[styles.sectionBullet, { backgroundColor: section.color }]} />
+              <Text style={[type.h2, { color: section.textColor }]}>{section.title}</Text>
+              <View style={[styles.sectionCountBadge, { backgroundColor: section.badgeBg }]}>
+                <Text style={[type.monoBold, { color: section.textColor, fontSize: 10 }]}>{section.data.length}</Text>
+              </View>
+            </View>
+          )}
+          ListHeaderComponent={
             <View>
-              <Text style={[type.display, { color: colors.text }]}>Pantry</Text>
-              <Text style={[type.bodySm, { color: colors.subText, marginTop: 2 }]}>
-                {items.length} items total • {urgentTotal > 0 ? `${urgentTotal} urgent items` : 'all fresh'}
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {lastActionItem.current && (
-                <IconButton
-                  icon={Undo2}
-                  onPress={handleUndo}
-                  accessibilityLabel="Undo last pantry action"
-                  color={palette.amberDeep}
-                  bg={colors.surface}
-                />
-              )}
-              <IconButton
-                icon={Plus}
-                onPress={() => setAddModalVisible(true)}
-                accessibilityLabel="Add manual pantry item"
-                color={palette.sageDeep}
-                bg={colors.surface}
-              />
-            </View>
-          </View>
-
-          {/* Search Bar */}
-          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Search size={18} color={colors.subText} strokeWidth={2} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search pantry items..."
-              placeholderTextColor={colors.subText}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
-                <X size={16} color={colors.subText} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Category Filter Chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-            {['all', 'produce', 'dairy', 'meat', 'bakery', 'pantry', 'frozen'].map((cat) => {
-              const isSelected = selectedCategory === cat;
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.catChip,
-                    {
-                      backgroundColor: isSelected ? palette.sageDeep : colors.surface,
-                      borderColor: isSelected ? palette.sageDeep : colors.border,
-                    },
-                  ]}
-                  onPress={() => { hapticSelection(); setSelectedCategory(cat); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Filter by ${cat}`}
-                >
-                  <Text style={[styles.catChipText, { color: isSelected ? palette.chalk : colors.text }]}>
-                    {cat.toUpperCase()}
+              {/* Header & Subtitle */}
+              <View style={styles.titleRow}>
+                <View>
+                  <Text style={[type.display, { color: colors.text }]}>Pantry</Text>
+                  <Text style={[type.bodySm, { color: colors.subText, marginTop: 2 }]}>
+                    {items.length} items total • {urgentTotal > 0 ? `${urgentTotal} urgent items` : 'all fresh'}
                   </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                </View>
 
-          {/* Loading Skeleton */}
-          {loading && (
-            <View style={{ gap: 10, marginTop: 12 }}>
-              <SkeletonCard height={88} />
-              <SkeletonCard height={88} />
-              <SkeletonCard height={88} />
-            </View>
-          )}
-
-          {/* ── SECTION 1: USE TODAY (Urgent) ── */}
-          {todayItems.length > 0 && (
-            <View style={styles.sectionWrap}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionBullet, { backgroundColor: palette.crimson }]} />
-                <Text style={[type.h2, { color: palette.crimson }]}>Use Today / Tomorrow</Text>
-                <View style={[styles.sectionCountBadge, { backgroundColor: palette.crimsonMist }]}>
-                  <Text style={[type.monoBold, { color: palette.crimson, fontSize: 10 }]}>{todayItems.length}</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {lastActionItem.current && (
+                    <IconButton
+                      icon={Undo2}
+                      onPress={handleUndo}
+                      accessibilityLabel="Undo last pantry action"
+                      color={palette.amberDeep}
+                      bg={colors.surface}
+                    />
+                  )}
+                  <IconButton
+                    icon={Plus}
+                    onPress={() => setAddModalVisible(true)}
+                    accessibilityLabel="Add manual pantry item"
+                    color={palette.sageDeep}
+                    bg={colors.surface}
+                  />
                 </View>
               </View>
 
-              {todayItems.map((item) => (
-                <PantryItemCard
-                  key={item.id}
-                  item={item}
-                  onConsume={() => handleConsume(item)}
-                  onFreeze={() => handleFreeze(item)}
-                  onDonate={() => handleDonate(item)}
-                  onDiscard={() => handleDiscard(item)}
-                  onTip={() => openStorageTip(item)}
-                  onRescue={() => router.push('/(tabs)/recipes')}
+              {/* Search Bar */}
+              <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Search size={18} color={colors.subText} strokeWidth={2} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.text }]}
+                  placeholder="Search pantry items..."
+                  placeholderTextColor={colors.subText}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
                 />
-              ))}
-            </View>
-          )}
-
-          {/* ── SECTION 2: USE THIS WEEK (Soon) ── */}
-          {weekItems.length > 0 && (
-            <View style={styles.sectionWrap}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionBullet, { backgroundColor: palette.amberDeep }]} />
-                <Text style={[type.h2, { color: colors.text }]}>Use This Week</Text>
-                <View style={[styles.sectionCountBadge, { backgroundColor: palette.goldMist }]}>
-                  <Text style={[type.monoBold, { color: palette.amberDeep, fontSize: 10 }]}>{weekItems.length}</Text>
-                </View>
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
+                    <X size={16} color={colors.subText} />
+                  </TouchableOpacity>
+                )}
               </View>
 
-              {weekItems.map((item) => (
-                <PantryItemCard
-                  key={item.id}
-                  item={item}
-                  onConsume={() => handleConsume(item)}
-                  onFreeze={() => handleFreeze(item)}
-                  onDonate={() => handleDonate(item)}
-                  onDiscard={() => handleDiscard(item)}
-                  onTip={() => openStorageTip(item)}
-                  onRescue={() => router.push('/(tabs)/recipes')}
-                />
-              ))}
-            </View>
-          )}
+              {/* Category Filter Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                {['all', 'produce', 'dairy', 'meat', 'bakery', 'pantry', 'frozen'].map((cat) => {
+                  const isSelected = selectedCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.catChip,
+                        {
+                          backgroundColor: isSelected ? palette.sageDeep : colors.surface,
+                          borderColor: isSelected ? palette.sageDeep : colors.border,
+                        },
+                      ]}
+                      onPress={() => { hapticSelection(); setSelectedCategory(cat); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Filter by ${cat}`}
+                    >
+                      <Text style={[styles.catChipText, { color: isSelected ? palette.chalk : colors.text }]}>
+                        {cat.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-          {/* ── SECTION 3: STABLE & SHELF-SAFE ── */}
-          {stableItems.length > 0 && (
-            <View style={styles.sectionWrap}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionBullet, { backgroundColor: palette.sageDeep }]} />
-                <Text style={[type.h2, { color: colors.text }]}>Stable & Shelf-Safe</Text>
-                <View style={[styles.sectionCountBadge, { backgroundColor: palette.sageMist }]}>
-                  <Text style={[type.monoBold, { color: palette.sageDeep, fontSize: 10 }]}>{stableItems.length}</Text>
+              {/* Loading Skeleton */}
+              {loading && (
+                <View style={{ gap: 10, marginTop: 12 }}>
+                  <SkeletonCard height={88} />
+                  <SkeletonCard height={88} />
+                  <SkeletonCard height={88} />
                 </View>
-              </View>
-
-              {stableItems.map((item) => (
-                <PantryItemCard
-                  key={item.id}
-                  item={item}
-                  onConsume={() => handleConsume(item)}
-                  onFreeze={() => handleFreeze(item)}
-                  onDonate={() => handleDonate(item)}
-                  onDiscard={() => handleDiscard(item)}
-                  onTip={() => openStorageTip(item)}
-                  onRescue={() => router.push('/(tabs)/recipes')}
-                />
-              ))}
+              )}
             </View>
-          )}
-
-          {/* Empty State */}
-          {!loading && filteredItems.length === 0 && (
-            <EmptyState
-              icon={Boxes}
-              title={searchQuery ? 'No Matching Items' : 'Pantry is Empty'}
-              message={
-                searchQuery
-                  ? `No pantry items matched "${searchQuery}". Clear your search or scan fresh groceries.`
-                  : 'Start by scanning your groceries or adding food items to track shelf-life and rescue recipes.'
-              }
-              actionLabel="Scan Groceries"
-              onAction={() => router.push('/scan')}
-            />
-          )}
-        </ScrollView>
+          }
+          ListEmptyComponent={
+            !loading && filteredItems.length === 0 ? (
+              <EmptyState
+                icon={Boxes}
+                title={searchQuery ? 'No Matching Items' : 'Pantry is Empty'}
+                message={
+                  searchQuery
+                    ? `No pantry items matched "${searchQuery}". Clear your search or scan fresh groceries.`
+                    : 'Start by scanning your groceries or adding food items to track shelf-life and rescue recipes.'
+                }
+                actionLabel="Scan Groceries"
+                onAction={() => router.push('/scan')}
+              />
+            ) : null
+          }
+        />
       )}
 
       {/* ── CONTEXTUAL STORAGE TIP MODAL ── */}
@@ -444,7 +433,10 @@ export default function InventoryScreen() {
       {/* ── MANUAL ADD MODAL ── */}
       {addModalVisible && (
         <Modal transparent animationType="slide" visible={addModalVisible}>
-          <View style={styles.modalBackdrop}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalBackdrop}
+          >
             <SurfaceCard style={styles.tipCard} variant="elevated">
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <Text style={[type.h2, { color: colors.text }]}>Add Pantry Item</Text>
@@ -488,7 +480,7 @@ export default function InventoryScreen() {
                 <SecondaryAction label="Cancel" onPress={() => setAddModalVisible(false)} />
               </View>
             </SurfaceCard>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       )}
     </View>

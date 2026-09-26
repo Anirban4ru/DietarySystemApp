@@ -33,29 +33,35 @@ export async function getVaultRecipes(): Promise<RecipeCandidate[]> {
   }
 }
 
-export async function saveRecipeToVault(recipe: RecipeCandidate) {
+export async function saveRecipeToVault(recipe: RecipeCandidate): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const vaultKey = getVaultKey(user?.id);
     const current = await getVaultRecipes();
-    if (current.some((r) => r.name === recipe.name)) return;
+    if (current.some((r) => r.name === recipe.name)) return { success: true };
 
     const updated = [recipe, ...current];
     await AsyncStorage.setItem(vaultKey, JSON.stringify(updated));
 
     if (user) {
-      await supabase.from('saved_recipes').insert({
+      const { error } = await supabase.from('saved_recipes').insert({
         user_id: user.id,
         name: recipe.name,
         recipe_json: recipe,
       });
+      if (error) {
+        console.warn('Vault remote save error:', error.message);
+        return { success: false, error: error.message };
+      }
     }
-  } catch (e) {
-    console.error('Failed to save to vault:', e);
+    return { success: true };
+  } catch (e: any) {
+    console.warn('Failed to save to vault:', e);
+    return { success: false, error: e?.message || 'Failed to save recipe' };
   }
 }
 
-export async function removeRecipeFromVault(name: string) {
+export async function removeRecipeFromVault(name: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const vaultKey = getVaultKey(user?.id);
@@ -64,14 +70,20 @@ export async function removeRecipeFromVault(name: string) {
     await AsyncStorage.setItem(vaultKey, JSON.stringify(updated));
 
     if (user) {
-      await supabase
+      const { error } = await supabase
         .from('saved_recipes')
         .delete()
         .eq('user_id', user.id)
         .eq('name', name);
+      if (error) {
+        console.warn('Vault remote delete error:', error.message);
+        return { success: false, error: error.message };
+      }
     }
-  } catch (e) {
-    console.error('Failed to remove from vault:', e);
+    return { success: true };
+  } catch (e: any) {
+    console.warn('Failed to remove from vault:', e);
+    return { success: false, error: e?.message || 'Failed to remove recipe' };
   }
 }
 
