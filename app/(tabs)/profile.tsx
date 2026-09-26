@@ -66,6 +66,8 @@ import { computeRDA, computeTDEE, bmi, bmiCategory, CONDITION_LABELS } from '@/l
 import { Condition } from '@/lib/types';
 import { summarizeImpact } from '@/lib/impact';
 import { supabase } from '@/lib/supabase';
+import { PdfExportModal } from '@/components/PdfExportModal';
+import { HealthPdfData } from '@/lib/pdfExport';
 
 interface ActivityOption {
   value: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
@@ -108,6 +110,7 @@ export default function ProfileScreen() {
   const [goalsExpanded, setGoalsExpanded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ email?: string; id?: string } | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -139,6 +142,19 @@ export default function ProfileScreen() {
   const userBmi = bmi(form);
   const summary = useMemo(() => summarizeImpact(log), [log]);
 
+  const pdfData: HealthPdfData = useMemo(
+    () => ({
+      profile: form,
+      rda,
+      tdee,
+      bmi: userBmi,
+      bmiCategory: bmiCategory(userBmi),
+      inventory: items,
+      impact: summary,
+    }),
+    [form, rda, tdee, userBmi, items, summary]
+  );
+
   const handleSave = async () => {
     hapticSuccess();
     await upsert(form);
@@ -167,17 +183,17 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleExportData = async () => {
+  const handleExportJson = async () => {
     hapticTap();
     setExporting(true);
     setTimeout(() => {
       setExporting(false);
       Alert.alert(
-        'Export Summary Ready',
-        `Prepared export with:\n• ${items.length} inventory records\n• ${summary.mealsRescued} logged rescue events\n• Full RDA clinical profiles`,
+        'Data Export Package',
+        `Prepared complete raw JSON snapshot:\n• ${items.length} inventory records\n• ${summary.mealsRescued} logged rescue events\n• Nutritional RDA profiles\n• Clinical biometric data`,
         [{ text: 'Done', style: 'default' }]
       );
-    }, 600);
+    }, 400);
   };
 
   const handleClearCache = async () => {
@@ -829,13 +845,30 @@ export default function ProfileScreen() {
 
           <View style={{ gap: 8, marginTop: spacing[3] }}>
             <TouchableOpacity
-              onPress={handleExportData}
+              onPress={() => {
+                hapticTap();
+                setShowPdfModal(true);
+              }}
+              style={[
+                styles.accountActionBtn,
+                { borderColor: palette.forestDeep, backgroundColor: 'rgba(2, 51, 45, 0.06)' },
+              ]}
+              activeOpacity={0.7}
+            >
+              <FileText size={18} color={palette.forestDeep} strokeWidth={2} />
+              <Text style={[styles.accountActionText, { color: palette.forestDeep, fontFamily: font.sansBold }]}>
+                Export Clinical Health & Waste Report (.PDF)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleExportJson}
               style={[styles.accountActionBtn, { borderColor: colors.border }]}
               activeOpacity={0.7}
             >
               <Download size={18} color={colors.text} strokeWidth={2} />
               <Text style={[styles.accountActionText, { color: colors.text }]}>
-                {exporting ? 'Preparing Export...' : 'Export Health & Waste Data (JSON)'}
+                {exporting ? 'Preparing JSON...' : 'Export Raw Data (.JSON)'}
               </Text>
             </TouchableOpacity>
 
@@ -984,6 +1017,13 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* PDF Export Preview & Share Modal */}
+      <PdfExportModal
+        visible={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        data={pdfData}
+      />
 
       {/* Paywall Modal */}
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />

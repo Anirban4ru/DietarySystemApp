@@ -318,7 +318,8 @@ Return ONLY this JSON format:
       ? [{ parts: [{ text: promptText }, { inlineData: { mimeType: 'image/jpeg', data: base64Image } }] }]
       : [{ parts: [{ text: promptText }] }];
 
-    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    let modelName = 'gemini-2.0-flash';
+    let geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -326,6 +327,19 @@ Return ONLY this JSON format:
         generationConfig: { responseMimeType: "application/json" }
       }),
     });
+
+    if (!geminiRes.ok) {
+      console.warn(`Gemini 2.0 returned ${geminiRes.status}, falling back to gemini-1.5-flash`);
+      modelName = 'gemini-1.5-flash';
+      geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          generationConfig: { responseMimeType: "application/json" }
+        }),
+      });
+    }
 
     const data = await geminiRes.json();
     if (!data.candidates || data.candidates.length === 0) {

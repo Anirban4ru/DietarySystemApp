@@ -21,7 +21,9 @@ import {
 import { PressableScale } from '@/components/motion';
 import { FOOD_CATALOG } from '@/lib/foodCatalog';
 import { useInventory, useXp, usePro } from '@/lib/hooks';
-import { parseReceipt, detectFoodItem } from '@/lib/ai';
+import { parseReceipt, detectFoodItem, inferFreshnessOnDevice } from '@/lib/ai';
+import { BoundingBoxOverlay } from '@/components/BoundingBoxOverlay';
+import { detectFoodWithYolox, YOLOXDetection } from '@/lib/yolox';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -50,6 +52,8 @@ export default function ScannerScreen() {
   const [detectedQuantity, setDetectedQuantity] = useState(1);
   const [detectedDays, setDetectedDays] = useState(7);
   const [itemResultReady, setItemResultReady] = useState(false);
+  const [detectedBoxes, setDetectedBoxes] = useState<YOLOXDetection[]>([]);
+  const [viewDims, setViewDims] = useState({ width: SCREEN_W, height: 500 });
 
   // Receipt Results State
   const [receiptItems, setReceiptItems] = useState<{ name: string; quantity: number }[] | null>(null);
@@ -162,9 +166,41 @@ export default function ScannerScreen() {
     hapticTap();
     setScanning(true);
     setScanError(null);
-    setScanProgressText('Capturing visual frame...');
+    setDetectedBoxes([]);
+    setScanProgressText('Scanning with on-device intelligence...');
 
     try {
+      if (scanMode === 'item') {
+        // Step 1: On-Device YOLOX Inference
+        try {
+          const yoloxResult = await detectFoodWithYolox(viewDims.width, viewDims.height);
+          if (
+            yoloxResult.success &&
+            yoloxResult.detections.length > 0 &&
+            !yoloxResult.shouldFallbackToGemini
+          ) {
+            setDetectedBoxes(yoloxResult.detections);
+            const topBox = yoloxResult.detections[0];
+            const foodName = topBox.label.charAt(0).toUpperCase() + topBox.label.slice(1);
+            const freshnessInfo = inferFreshnessOnDevice(foodName);
+
+            setDetectedName(foodName);
+            setDetectedConfidence(topBox.confidence);
+            setDetectedFreshness(freshnessInfo.freshness);
+            setDetectedDays(freshnessInfo.shelfLifeDays);
+            setDetectedQuantity(1);
+            setItemResultReady(true);
+            setScanProgressText(`YOLOX Recognized: ${foodName} (${Math.round(topBox.confidence * 100)}%)`);
+            hapticSuccess();
+            return;
+          }
+        } catch (yoloxErr) {
+          console.warn('YOLOX inference skipped/fallback:', yoloxErr);
+        }
+      }
+
+      // Step 2: Camera Capture for Gemini Vision (or Receipt Parsing)
+      setScanProgressText('Capturing visual frame...');
       let photoBase64: string | null = null;
       if (cameraRef.current) {
         try {
@@ -178,13 +214,12 @@ export default function ScannerScreen() {
             photoBase64 = manipulated.base64 ?? null;
           }
         } catch (camErr) {
-          console.warn('Hardware camera capture failed, using fallback:', camErr);
+          console.warn('Hardware camera capture failed:', camErr);
         }
       }
 
       if (!photoBase64) {
-        runDemoScan();
-        return;
+        throw new Error('Unable to capture camera frame. Please ensure camera lens is unobstructed and retry.');
       }
 
       if (scanMode === 'receipt') {
@@ -199,23 +234,20 @@ export default function ScannerScreen() {
         }
       } else {
         setScanProgressText('Classifying ingredients with Gemini Vision...');
-        try {
-          const result = await detectFoodItem(photoBase64);
-          const foodName = FOOD_CATALOG.find((f) => f.name.toLowerCase() === result.name?.toLowerCase())?.name || result.name || 'Fresh Ingredient';
+        const result = await detectFoodItem(photoBase64);
+        const foodName =
+          FOOD_CATALOG.find((f) => f.name.toLowerCase() === result.name?.toLowerCase())?.name ||
+          result.name ||
+          'Fresh Ingredient';
 
-          setDetectedName(foodName);
-          setDetectedConfidence(result.confidence || 0.92);
-          setDetectedFreshness(result.freshness || 0.85);
-          setDetectedDays(Math.max(1, Math.round((result.freshness || 0.85) * 10)));
-          setDetectedQuantity(1);
-          setItemResultReady(true);
-          setScanProgressText(`Identified: ${foodName}`);
-          hapticSuccess();
-        } catch (err: any) {
-          console.warn('Food detection error, running demo fallback:', err);
-          runDemoScan();
-          return;
-        }
+        setDetectedName(foodName);
+        setDetectedConfidence(result.confidence || 0.92);
+        setDetectedFreshness(result.freshness || 0.85);
+        setDetectedDays(Math.max(1, Math.round((result.freshness || 0.85) * 10)));
+        setDetectedQuantity(1);
+        setItemResultReady(true);
+        setScanProgressText(`Identified: ${foodName}`);
+        hapticSuccess();
       }
     } catch (e: any) {
       console.warn('Scan failed:', e);
@@ -293,6 +325,7 @@ export default function ScannerScreen() {
     hapticTap();
     setItemResultReady(false);
     setReceiptItems(null);
+    setDetectedBoxes([]);
     setScanError(null);
     setScanProgressText('Point at a food item or receipt');
   };
@@ -302,13 +335,39 @@ export default function ScannerScreen() {
   return (
     <View style={styles.container}>
       {/* ── CAMERA VIEWPORT ── */}
-      <View style={styles.cameraWrap}>
+      <View
+        style={styles.cameraWrap}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          if (width > 0 && height > 0) {
+            setViewDims({ width, height });
+          }
+        }}
+      >
         <CameraView
           style={StyleSheet.absoluteFill}
           facing="back"
           ref={cameraRef}
           barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'upc_e', 'upc_a'] }}
           onBarcodeScanned={scanMode === 'barcode' && !itemResultReady ? ({ data }) => handleBarcodeScanned(data) : undefined}
+        />
+
+        {/* Bounding Box Overlay for on-device detections */}
+        <BoundingBoxOverlay
+          boxes={detectedBoxes}
+          viewWidth={viewDims.width}
+          viewHeight={viewDims.height}
+          onSelectBox={(box) => {
+            hapticSelection();
+            const foodName = box.label.charAt(0).toUpperCase() + box.label.slice(1);
+            const freshnessInfo = inferFreshnessOnDevice(foodName);
+            setDetectedName(foodName);
+            setDetectedConfidence(box.confidence);
+            setDetectedFreshness(freshnessInfo.freshness);
+            setDetectedDays(freshnessInfo.shelfLifeDays);
+            setDetectedQuantity(1);
+            setItemResultReady(true);
+          }}
         />
 
         {/* Top Controls Overlay */}
