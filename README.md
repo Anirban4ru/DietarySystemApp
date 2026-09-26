@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-<img src="./assets/icon.png" width="128" height="128" alt="Nourish App Icon" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(2, 51, 45, 0.25);" />
+<img src="https://raw.githubusercontent.com/Anirban4ru/DietarySystemApp/main/assets/icon.png?v=3" width="128" height="128" alt="Nourish App Icon" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(2, 51, 45, 0.25);" />
 
 # Nourish: Precision Clinical Nutrition & Dietary Intelligence
 
@@ -113,54 +113,17 @@ Modern household food management suffers from a dual crisis: clinical dietary mi
 
 ---
 
-## ⚡ Getting Started (Local Development)
+## 🔒 Intellectual Property & Proprietary Notice
 
-### Prerequisites
-* **Node.js**: v18.x or higher
-* **Package Manager**: `npm` or `yarn`
-* **Mobile Runtime**: Expo Go app on iOS/Android, or Android Studio / Xcode Simulator
-
-### Installation
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/Anirban4ru/DietarySystemApp.git
-   cd DietarySystemApp
-   ```
-
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Configure Environment Variables**:
-   Create a `.env` file in the root directory:
-   ```env
-   EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
-   ```
-
-4. **Start the Development Server**:
-   ```bash
-   npx expo start
-   ```
-
----
-
-## 📦 Production Builds (EAS)
-
-Generate optimized standalone `.apk` distribution builds:
-```bash
-# Build Android preview APK
-npx eas-cli build -p android --profile preview
-```
+> **Confidential & Proprietary**: This repository is a technical showcase and portfolio demonstration of full-stack mobile systems engineering and clinical nutrition informatics by **Anirban Chatterjee**. 
+>
+> All architecture, algorithmic implementations (clinical contraindication mapping, metabolic TDEE calculation, heuristic substitution engines), and custom UI components are proprietary. **Unlicensed cloning, commercial deployment, or redistribution of this codebase is strictly prohibited.**
 
 ---
 
 ## 👨‍💻 Engineering & Architecture
 
-Designed, architected, and built by **Anirban Ghosh**.
+Designed, architected, and built by **Anirban Chatterjee**.
 
 * **Focus Areas**: Mobile System Architecture, Full-Stack TypeScript, Healthcare/Nutrition Informatics, Zero-Trust Database Design.
 * **GitHub**: [@Anirban4ru](https://github.com/Anirban4ru)
