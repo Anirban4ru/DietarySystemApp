@@ -10,7 +10,10 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import {
   Calendar,
   Plus,
@@ -658,6 +661,7 @@ interface AddMealModalProps {
 
 function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMealModalProps) {
   const { colors, mode } = useTheme();
+  const keyboardHeight = useKeyboardHeight();
   const [meal, setMeal] = useState<MealType>(initialMeal);
   const [recipe, setRecipe] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>(CURATED_SUGGESTIONS);
@@ -693,11 +697,27 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View
+          style={[
+            styles.modalOverlay,
+            Platform.OS === 'android' && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight }
+              : null,
+          ]}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%' }}
+          >
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View
+                style={[
+                  styles.modalSheet,
+                  { backgroundColor: colors.surface },
+                  keyboardHeight > 0 ? { maxHeight: '92%' } : null,
+                ]}
+              >
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
 
           {/* Header */}
@@ -778,7 +798,14 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
           </View>
 
           {/* Suggestions List */}
-          <View style={{ flex: 1, minHeight: 140, maxHeight: 200, marginTop: spacing[3] }}>
+          <View
+            style={{
+              flex: 1,
+              minHeight: keyboardHeight > 0 ? 80 : 140,
+              maxHeight: keyboardHeight > 0 ? 130 : 200,
+              marginTop: spacing[3],
+            }}
+          >
             <Text style={[styles.fieldHeader, { color: colors.subText, marginBottom: 8 }]}>
               {searching ? 'SEARCHING AI IDEAS...' : 'CURATED & INGREDIENT INSPIRATION'}
             </Text>
@@ -835,8 +862,11 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
             icon={<Check size={18} color={palette.chalk} strokeWidth={2.5} />}
             style={{ marginTop: spacing[4] }}
           />
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </View>
-      </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }

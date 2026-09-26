@@ -11,7 +11,10 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import {
   Plus,
   X,
@@ -393,6 +396,7 @@ interface AddShoppingModalProps {
 
 function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
   const { colors, mode } = useTheme();
+  const keyboardHeight = useKeyboardHeight();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ name: string; category: string }[]>([]);
   const [searching, setSearching] = useState(false);
@@ -431,11 +435,27 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View
+          style={[
+            styles.modalOverlay,
+            Platform.OS === 'android' && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight }
+              : null,
+          ]}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%' }}
+          >
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View
+                style={[
+                  styles.modalSheet,
+                  { backgroundColor: colors.surface },
+                  keyboardHeight > 0 ? { maxHeight: '92%' } : null,
+                ]}
+              >
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
 
           <View style={styles.modalHeader}>
@@ -481,7 +501,14 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
           </View>
 
           {/* Results / Quick add */}
-          <View style={{ flex: 1, minHeight: 160, maxHeight: 260, marginTop: spacing[3] }}>
+          <View
+            style={{
+              flex: 1,
+              minHeight: keyboardHeight > 0 ? 80 : 160,
+              maxHeight: keyboardHeight > 0 ? 150 : 260,
+              marginTop: spacing[3],
+            }}
+          >
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {results.length > 0 ? (
                 <View style={{ gap: 6 }}>
@@ -548,8 +575,11 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
               style={{ marginTop: spacing[3] }}
             />
           )}
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </View>
-      </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }

@@ -11,6 +11,7 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useTheme } from './ui';
 import { palette, spacing } from '@/lib/theme';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -22,6 +23,7 @@ interface BottomSheetProps {
 
 export function BottomSheet({ children, visible, onClose }: BottomSheetProps) {
   const { colors } = useTheme();
+  const keyboardHeight = useKeyboardHeight();
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const context = useSharedValue({ y: 0 });
 
@@ -83,7 +85,12 @@ export function BottomSheet({ children, visible, onClose }: BottomSheetProps) {
       
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardAvoid}
+        style={[
+          styles.keyboardAvoid,
+          Platform.OS === 'android' && keyboardHeight > 0
+            ? { paddingBottom: keyboardHeight }
+            : null,
+        ]}
         pointerEvents="box-none"
       >
         <GestureDetector gesture={panGesture}>

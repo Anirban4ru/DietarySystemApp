@@ -2,8 +2,9 @@ import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
   ScrollView, Animated, ActivityIndicator, Alert, SectionList,
-  Platform, KeyboardAvoidingView,
+  Platform, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import {
   Plus, AlertTriangle, X, Check, Trash2, Filter,
   ChefHat, Info, ShoppingBag, Snowflake, HeartHandshake,
@@ -52,6 +53,7 @@ export default function InventoryScreen() {
   const { addXp } = useXp();
 
   const [activeSegment, setActiveSegment] = useState<'pantry' | 'grocery'>('pantry');
+  const keyboardHeight = useKeyboardHeight();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [tipItem, setTipItem] = useState<InventoryRow | null>(null);
@@ -433,54 +435,67 @@ export default function InventoryScreen() {
       {/* ── MANUAL ADD MODAL ── */}
       {addModalVisible && (
         <Modal transparent animationType="slide" visible={addModalVisible}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.modalBackdrop}
-          >
-            <SurfaceCard style={styles.tipCard} variant="elevated">
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <Text style={[type.h2, { color: colors.text }]}>Add Pantry Item</Text>
-                <TouchableOpacity onPress={() => setAddModalVisible(false)} accessibilityLabel="Close add modal">
-                  <X size={20} color={colors.subText} />
-                </TouchableOpacity>
-              </View>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View
+              style={[
+                styles.modalBackdrop,
+                Platform.OS === 'android' && keyboardHeight > 0
+                  ? { paddingBottom: keyboardHeight }
+                  : null,
+              ]}
+            >
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={{ width: '100%', alignItems: 'center' }}
+              >
+                <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                  <SurfaceCard style={styles.tipCard} variant="elevated">
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <Text style={[type.h2, { color: colors.text }]}>Add Pantry Item</Text>
+                      <TouchableOpacity onPress={() => setAddModalVisible(false)} accessibilityLabel="Close add modal">
+                        <X size={20} color={colors.subText} />
+                      </TouchableOpacity>
+                    </View>
 
-              <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>FOOD NAME</Text>
-              <TextInput
-                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                placeholder="Enter food name"
-                placeholderTextColor={colors.subText}
-                value={newItemName}
-                onChangeText={setNewItemName}
-              />
+                    <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>FOOD NAME</Text>
+                    <TextInput
+                      style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                      placeholder="Enter food name"
+                      placeholderTextColor={colors.subText}
+                      value={newItemName}
+                      onChangeText={setNewItemName}
+                    />
 
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>QUANTITY</Text>
-                  <TextInput
-                    style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                    keyboardType="numeric"
-                    value={newItemQty}
-                    onChangeText={setNewItemQty}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>DAYS LEFT</Text>
-                  <TextInput
-                    style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                    keyboardType="numeric"
-                    value={newItemDays}
-                    onChangeText={setNewItemDays}
-                  />
-                </View>
-              </View>
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>QUANTITY</Text>
+                        <TextInput
+                          style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                          keyboardType="numeric"
+                          value={newItemQty}
+                          onChangeText={setNewItemQty}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[type.label, { color: colors.subText, marginBottom: 4 }]}>DAYS LEFT</Text>
+                        <TextInput
+                          style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                          keyboardType="numeric"
+                          value={newItemDays}
+                          onChangeText={setNewItemDays}
+                        />
+                      </View>
+                    </View>
 
-              <View style={{ marginTop: spacing[5], gap: 10 }}>
-                <PrimaryAction label="Save Item" onPress={handleSaveNewItem} variant="sage" />
-                <SecondaryAction label="Cancel" onPress={() => setAddModalVisible(false)} />
-              </View>
-            </SurfaceCard>
-          </KeyboardAvoidingView>
+                    <View style={{ marginTop: spacing[5], gap: 10 }}>
+                      <PrimaryAction label="Save Item" onPress={handleSaveNewItem} variant="sage" />
+                      <SecondaryAction label="Cancel" onPress={() => setAddModalVisible(false)} />
+                    </View>
+                  </SurfaceCard>
+                </TouchableWithoutFeedback>
+              </KeyboardAvoidingView>
+            </View>
+          </TouchableWithoutFeedback>
         </Modal>
       )}
     </View>
