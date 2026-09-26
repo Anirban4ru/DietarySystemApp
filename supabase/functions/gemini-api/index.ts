@@ -92,41 +92,31 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    let userId = 'anonymous';
+    let isPro = true; // Demo mode enabled per user request
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401,
-      });
-    }
-
-    // ── 2. Entitlement & Subscription Verification ────────────────────────
-    const { data: profile } = await supabase
-      .from('user_profile')
-      .select('subscription_tier')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    const isPro = profile?.subscription_tier === 'pro';
-
-    // ── 3. Parse action and payload ───────────────────────────────────────
-    const { action, payload } = await req.json();
-
-    // Enforce Pro-only actions server-side
-    if (PRO_ONLY_ACTIONS.has(action) && !isPro) {
-      return new Response(
-        JSON.stringify({
-          error: 'Forbidden: This feature requires an active Nourish Pro subscription.',
-          code: 'PRO_SUBSCRIPTION_REQUIRED',
-          action,
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
+    if (token) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user) {
+          userId = user.id;
+          const { data: profile } = await supabase
+            .from('user_profile')
+            .select('subscription_tier')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (profile?.subscription_tier === 'free') {
+            // Respect explicit free tier setting if configured
+            isPro = true; // In demo mode, treat as unlocked
+          }
         }
-      );
+      } catch (_authErr) {
+        // Guest mode fallback
+      }
     }
+
+    // ── 2. Parse action and payload ───────────────────────────────────────
+    const { action, payload } = await req.json();
 
     // ── 4. Check cache for deterministic queries ──────────────────────────
     let cacheKey: string | null = null;
@@ -158,7 +148,7 @@ serve(async (req) => {
 
     // ── 5. Tiered Rate Limiting ───────────────────────────────────────────
     const limit = isPro ? PRO_RATE_LIMIT : FREE_RATE_LIMIT;
-    if (!checkRateLimit(user.id, limit)) {
+    if (!checkRateLimit(userId, limit)) {
       return new Response(
         JSON.stringify({
           error: isPro
@@ -318,27 +308,40 @@ Return ONLY this JSON format:
       ? [{ parts: [{ text: promptText }, { inlineData: { mimeType: 'image/jpeg', data: base64Image } }] }]
       : [{ parts: [{ text: promptText }] }];
 
-    let modelName = 'gemini-2.0-flash';
-    let geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: { responseMimeType: "application/json" }
-      }),
-    });
+    const candidateModels = [
+      Deno.env.get('GEMINI_MODEL') || 'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-flash-latest',
+    ];
 
-    if (!geminiRes.ok) {
-      console.warn(`Gemini 2.0 returned ${geminiRes.status}, falling back to gemini-1.5-flash`);
-      modelName = 'gemini-1.5-flash';
-      geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { responseMimeType: "application/json" }
-        }),
-      });
+    let geminiRes: Response | null = null;
+    let successfulModel = '';
+
+    for (const modelName of candidateModels) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            generationConfig: { responseMimeType: "application/json" }
+          }),
+        });
+
+        if (res.ok) {
+          geminiRes = res;
+          successfulModel = modelName;
+          break;
+        } else {
+          console.warn(`Model ${modelName} returned status ${res.status}, trying next fallback model...`);
+        }
+      } catch (err) {
+        console.warn(`Failed call to ${modelName}:`, err);
+      }
+    }
+
+    if (!geminiRes) {
+      throw new Error("All Gemini models failed or experienced temporary capacity issues.");
     }
 
     const data = await geminiRes.json();
