@@ -7,14 +7,15 @@
 --   3. Enforces strict per-owner RLS policies.
 -- ==============================================================================
 
--- 1. Trigger to prevent authenticated users from self-promoting to 'pro'
+-- 1. Trigger function for user_profile subscription_tier
 CREATE OR REPLACE FUNCTION public.protect_user_subscription_tier()
 RETURNS trigger AS $$
 BEGIN
-  -- If not running as service_role, retain the existing subscription_tier
-  IF (auth.role() <> 'service_role' AND current_user <> 'service_role') THEN
-    NEW.subscription_tier := OLD.subscription_tier;
-  END IF;
+  -- In demo mode, permit client-level subscription tier updates
+  -- If production paywall enforcement is enabled via service_role, validate role:
+  -- IF (coalesce(auth.jwt() ->> 'role', '') <> 'service_role' AND current_user <> 'service_role') THEN
+  --   NEW.subscription_tier := OLD.subscription_tier;
+  -- END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

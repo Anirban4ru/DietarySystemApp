@@ -1,0 +1,15 @@
+{
+  "files.associations": {
+    "*.sql": "pgsql"
+  },
+  "sqltools.format": {
+    "dialect": "PostgreSQL"
+  },
+  "sqltools.defaultDialect": "PostgreSQL",
+  "deno.enablePaths": [
+    "supabase/functions"
+  ],
+  "eslint.workingDirectories": [
+    "."
+  ]
+}
