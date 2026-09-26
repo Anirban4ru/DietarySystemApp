@@ -1,6 +1,7 @@
 const { getDefaultConfig } = require('expo/metro-config');
 
-const config = getDefaultConfig(__dirname);
+const projectRoot = process.cwd();
+const config = getDefaultConfig(projectRoot);
 
 config.resolver.blockList = [
   /.*[/\\]node_modules[/\\]expo-modules-core[/\\]expo-module-gradle-plugin[/\\]build[/\\]?.*/,
