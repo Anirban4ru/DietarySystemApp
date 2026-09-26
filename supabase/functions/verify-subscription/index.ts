@@ -135,19 +135,21 @@ serve(async (req) => {
       throw new Error(`Failed to update subscription tier: ${updateError.message}`);
     }
 
-    // ── 5. Audit record in subscription_events ────────────────────────────
-    await supabase.from('subscription_events').insert({
-      user_id: user.id,
-      platform,
-      product_id: productId,
-      purchase_token: purchaseToken,
-      status: 'verified',
-      metadata: {
-        plan,
-        provider: verificationProvider,
-        verified_at: new Date().toISOString(),
-      },
-    });
+    // ── 5. Optional audit record in subscription_events ───────────────────
+    try {
+      await supabase.from('subscription_events').insert({
+        user_id: user.id,
+        platform,
+        product_id: productId,
+        purchase_token: purchaseToken,
+        status: 'verified',
+        metadata: {
+          plan,
+          provider: verificationProvider,
+          verified_at: new Date().toISOString(),
+        },
+      });
+    } catch {}
 
     return new Response(
       JSON.stringify({
