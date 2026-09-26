@@ -522,7 +522,15 @@ export default function ProfileScreen() {
             Determines your Total Daily Energy Expenditure (TDEE).
           </Text>
 
-          <View style={{ gap: 8, marginTop: spacing[3] }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              gap: 12,
+              paddingVertical: spacing[3],
+              paddingHorizontal: 2,
+            }}
+          >
             {ACTIVITY_OPTIONS.map((item) => {
               const isSelected = form.activity_level === item.value;
               const Icon = item.icon;
@@ -535,62 +543,70 @@ export default function ProfileScreen() {
                     setForm((f) => ({ ...f, activity_level: item.value }));
                   }}
                   style={[
-                    styles.activityItem,
+                    styles.activityItemHorizontal,
                     {
                       backgroundColor: isSelected
                         ? mode === 'dark'
-                          ? 'rgba(2, 51, 45, 0.25)'
+                          ? 'rgba(2, 51, 45, 0.35)'
                           : 'rgba(2, 51, 45, 0.08)'
                         : colors.bg,
                       borderColor: isSelected ? palette.forestDeep : colors.border,
-                      borderWidth: 1,
+                      borderWidth: isSelected ? 2 : 1,
                     },
                   ]}
                   accessibilityLabel={`Select activity ${item.label}`}
                 >
-                  <View
-                    style={[
-                      styles.activityIconCircle,
-                      {
-                        backgroundColor: isSelected
-                          ? palette.forestDeep
-                          : mode === 'dark'
-                          ? colors.surface
-                          : 'rgba(0,0,0,0.04)',
-                      },
-                    ]}
-                  >
-                    <Icon
-                      size={18}
-                      color={isSelected ? palette.chalk : colors.subText}
-                      strokeWidth={2.2}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text
+                  <View style={{ position: 'relative', marginBottom: 10 }}>
+                    <View
                       style={[
-                        styles.activityLabel,
+                        styles.activityIconCircleHorizontal,
                         {
-                          color: isSelected ? palette.forestDeep : colors.text,
-                          fontFamily: isSelected ? font.sansBold : font.sans,
+                          backgroundColor: isSelected
+                            ? palette.forestDeep
+                            : mode === 'dark'
+                            ? colors.surface
+                            : 'rgba(0,0,0,0.04)',
                         },
                       ]}
                     >
-                      {item.label}
-                    </Text>
-                    <Text style={[styles.activityDesc, { color: colors.subText }]}>
-                      {item.desc}
-                    </Text>
+                      <Icon
+                        size={22}
+                        color={isSelected ? palette.chalk : colors.subText}
+                        strokeWidth={2.2}
+                      />
+                    </View>
+                    {isSelected && (
+                      <View style={styles.activityBadgeWrap}>
+                        <Check size={11} color={palette.chalk} strokeWidth={3} />
+                      </View>
+                    )}
                   </View>
 
-                  {isSelected && (
-                    <Check size={18} color={palette.forestDeep} strokeWidth={2.8} />
-                  )}
+                  <Text
+                    style={[
+                      styles.activityLabelHorizontal,
+                      {
+                        color: isSelected ? palette.forestDeep : colors.text,
+                        fontFamily: isSelected ? font.sansBold : font.sansMed,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activityDescHorizontal,
+                      { color: colors.subText },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {item.desc}
+                  </Text>
                 </PressableScale>
               );
             })}
-          </View>
+          </ScrollView>
         </SurfaceCard>
 
         {/* ── Health Conditions & Dietary Swaps ── */}
@@ -1114,6 +1130,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
   },
+  activityItemHorizontal: {
+    width: 130,
+    minHeight: 145,
+    padding: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   activityIconCircle: {
     width: 38,
     height: 38,
@@ -1121,13 +1145,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  activityIconCircleHorizontal: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityBadgeWrap: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: palette.forestDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   activityLabel: {
     fontSize: 14,
+  },
+  activityLabelHorizontal: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 4,
   },
   activityDesc: {
     fontSize: 11,
     fontFamily: font.sans,
     marginTop: 1,
+  },
+  activityDescHorizontal: {
+    fontSize: 11,
+    fontFamily: font.sans,
+    textAlign: 'center',
+    lineHeight: 15,
   },
   conditionsGrid: {
     flexDirection: 'row',

@@ -194,79 +194,89 @@ export default function ImpactScreen() {
           </View>
         </SurfaceCard>
 
-        {/* ── 4 Primary Impact Metrics ── */}
-        <View style={styles.metricsGrid}>
+        {/* ── 4 Primary Impact Metrics (Two deterministic rows) ── */}
+        <View style={styles.metricRow}>
           {/* CO2e Saved */}
-          <PressableScale
-            onPress={() => {
-              hapticSelection();
-              setActiveMetricInfo(activeMetricInfo === 'co2e' ? null : 'co2e');
-            }}
-            style={styles.metricGridItem}
-          >
-            <MetricCard
-              label="CO₂e Avoided"
-              value={`${Math.abs(summary.totalCo2eAvoided).toFixed(1)} kg`}
-              unit="prevented"
-              change={`${comparison.pctBetter}% vs avg`}
-              isPositive={comparison.pctBetter >= 0}
-              icon={<Leaf size={16} color={palette.forestDeep} strokeWidth={2.5} />}
-            />
-          </PressableScale>
+          <View style={{ flex: 1 }}>
+            <PressableScale
+              onPress={() => {
+                hapticSelection();
+                setActiveMetricInfo(activeMetricInfo === 'co2e' ? null : 'co2e');
+              }}
+              style={{ width: '100%' }}
+            >
+              <MetricCard
+                label="CO₂e Avoided"
+                value={`${Math.abs(summary.totalCo2eAvoided).toFixed(1)} kg`}
+                unit="prevented"
+                change={`${comparison.pctBetter}% vs avg`}
+                isPositive={comparison.pctBetter >= 0}
+                icon={<Leaf size={16} color={palette.forestDeep} strokeWidth={2.5} />}
+              />
+            </PressableScale>
+          </View>
 
           {/* Money Saved */}
-          <PressableScale
-            onPress={() => {
-              hapticSelection();
-              setActiveMetricInfo(activeMetricInfo === 'money' ? null : 'money');
-            }}
-            style={styles.metricGridItem}
-          >
-            <MetricCard
-              label="Money Saved"
-              value={`₹${moneySaved.toLocaleString('en-IN')}`}
-              unit="saved"
-              change="Est. pantry value"
-              isPositive={true}
-              icon={<TrendingUp size={16} color={palette.forestDeep} strokeWidth={2.5} />}
-            />
-          </PressableScale>
+          <View style={{ flex: 1 }}>
+            <PressableScale
+              onPress={() => {
+                hapticSelection();
+                setActiveMetricInfo(activeMetricInfo === 'money' ? null : 'money');
+              }}
+              style={{ width: '100%' }}
+            >
+              <MetricCard
+                label="Money Saved"
+                value={`₹${moneySaved.toLocaleString('en-IN')}`}
+                unit="saved"
+                change="Est. pantry value"
+                isPositive={true}
+                icon={<TrendingUp size={16} color={palette.forestDeep} strokeWidth={2.5} />}
+              />
+            </PressableScale>
+          </View>
+        </View>
 
+        <View style={[styles.metricRow, { marginTop: 10, marginBottom: spacing[3] }]}>
           {/* Food Waste Avoided */}
-          <PressableScale
-            onPress={() => {
-              hapticSelection();
-              setActiveMetricInfo(activeMetricInfo === 'waste' ? null : 'waste');
-            }}
-            style={styles.metricGridItem}
-          >
-            <MetricCard
-              label="Waste Avoided"
-              value={`${wasteWeightSaved} kg`}
-              unit="diverted"
-              change={`${summary.itemsConsumed} consumed`}
-              isPositive={true}
-              icon={<Sprout size={16} color={palette.forestDeep} strokeWidth={2.5} />}
-            />
-          </PressableScale>
+          <View style={{ flex: 1 }}>
+            <PressableScale
+              onPress={() => {
+                hapticSelection();
+                setActiveMetricInfo(activeMetricInfo === 'waste' ? null : 'waste');
+              }}
+              style={{ width: '100%' }}
+            >
+              <MetricCard
+                label="Waste Avoided"
+                value={`${wasteWeightSaved} kg`}
+                unit="diverted"
+                change={`${summary.itemsConsumed} consumed`}
+                isPositive={true}
+                icon={<Sprout size={16} color={palette.forestDeep} strokeWidth={2.5} />}
+              />
+            </PressableScale>
+          </View>
 
           {/* Meals Rescued */}
-          <PressableScale
-            onPress={() => {
-              hapticSelection();
-              setActiveMetricInfo(activeMetricInfo === 'rescued' ? null : 'rescued');
-            }}
-            style={styles.metricGridItem}
-          >
-            <MetricCard
-              label="Meals Rescued"
-              value={summary.mealsRescued}
-              unit="cooked"
-              change={`${summary.itemsDiscarded} discarded`}
-              isPositive={summary.mealsRescued >= summary.itemsDiscarded}
-              icon={<Award size={16} color={palette.forestDeep} strokeWidth={2.5} />}
-            />
-          </PressableScale>
+          <View style={{ flex: 1 }}>
+            <PressableScale
+              onPress={() => {
+                hapticSelection();
+                setActiveMetricInfo(activeMetricInfo === 'rescued' ? null : 'rescued');
+              }}
+              style={{ width: '100%' }}
+            >
+              <MetricCard
+                label="Meals Rescued"
+                value={summary.mealsRescued}
+                unit="cooked"
+                change={`${summary.itemsDiscarded} discarded`}
+                isPositive={summary.mealsRescued >= summary.itemsDiscarded}
+                icon={<Award size={16} color={palette.forestDeep} strokeWidth={2.5} />}
+              />
+            </PressableScale>
+          </View>
         </View>
 
         {/* Metric Definition Banner */}
@@ -293,7 +303,7 @@ export default function ImpactScreen() {
         )}
 
         {/* ── 7-Day Avoidance Trend Chart ── */}
-        <View style={{ marginVertical: spacing[3] }}>
+        <SurfaceCard style={[styles.cardSection, { marginBottom: spacing[3] }]}>
           <TrendChart
             title="Weekly CO₂e Diverted"
             subtitle="Daily carbon footprint savings from kitchen rescue cooking"
@@ -305,7 +315,7 @@ export default function ImpactScreen() {
             chartType="line"
             height={150}
           />
-        </View>
+        </SurfaceCard>
 
         {/* ── Weekly Goal Progress ── */}
         <SurfaceCard style={styles.cardSection}>
@@ -690,6 +700,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sansBold,
     marginTop: 2,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
   },
   metricsGrid: {
     flexDirection: 'row',

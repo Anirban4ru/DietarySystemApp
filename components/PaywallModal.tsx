@@ -4,6 +4,7 @@ import {
   Dimensions, Switch, ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Crown, Check, X, ShieldCheck, Zap,
   Lock, RefreshCw, AlertCircle, CheckCircle2, ArrowRight
@@ -70,16 +71,23 @@ export function PaywallModal({
   feature: targetFeature,
 }: PaywallModalProps) {
   const { colors, mode } = useTheme();
+  const insets = useSafeAreaInsets();
   const {
     isPro,
     unlockPro,
     activeFeaturePaywall,
+    isPaywallOpen,
     closePaywall,
   } = usePro();
   const toast = useToast();
 
-  const isVisible = controlledVisible !== undefined ? controlledVisible : Boolean(activeFeaturePaywall);
-  const handleClose = controlledOnClose ?? closePaywall;
+  const isVisible = controlledVisible !== undefined 
+    ? controlledVisible 
+    : (isPaywallOpen || Boolean(activeFeaturePaywall));
+  const handleClose = () => {
+    if (controlledOnClose) controlledOnClose();
+    closePaywall();
+  };
   const currentFeature = targetFeature ?? activeFeaturePaywall;
 
   const [state, setState] = useState<'idle' | 'purchasing' | 'restoring' | 'success' | 'error'>('idle');
@@ -138,13 +146,27 @@ export function PaywallModal({
   const featureContext = currentFeature ? FEATURE_DESCRIPTIONS[currentFeature] : null;
 
   return (
-    <Modal transparent animationType="slide" visible={isVisible}>
-      <BlurView intensity={90} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill}>
-        <View style={styles.container}>
+    <Modal transparent animationType="slide" visible={isVisible} statusBarTranslucent>
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: isDark ? '#121614' : '#F7F4EE',
+          },
+        ]}
+      >
+        <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
           {/* Top Close Button */}
           <TouchableOpacity
-            style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}
+            style={[
+              styles.closeBtn,
+              {
+                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                top: insets.top + 8,
+              },
+            ]}
             onPress={handleClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
             accessibilityLabel="Close paywall"
           >
@@ -329,7 +351,7 @@ export function PaywallModal({
             </Text>
           </ScrollView>
         </View>
-      </BlurView>
+      </View>
     </Modal>
   );
 }
@@ -337,11 +359,9 @@ export function PaywallModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 48,
   },
   closeBtn: {
     position: 'absolute',
-    top: 48,
     right: 20,
     width: 36,
     height: 36,

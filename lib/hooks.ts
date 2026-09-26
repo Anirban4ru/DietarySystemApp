@@ -26,6 +26,7 @@ export interface ProContextType {
   useScan: () => Promise<boolean>;
   hasEntitlement: (entitlement: ProEntitlement) => boolean;
   activeFeaturePaywall: ProEntitlement | null;
+  isPaywallOpen: boolean;
   openPaywallFor: (feature?: ProEntitlement) => void;
   closePaywall: () => void;
   subscriptionPlan: 'annual' | 'monthly' | 'none';
@@ -43,6 +44,7 @@ export const ProContext = createContext<ProContextType>({
   useScan: async () => true,
   hasEntitlement: () => false,
   activeFeaturePaywall: null,
+  isPaywallOpen: false,
   openPaywallFor: () => {},
   closePaywall: () => {},
   subscriptionPlan: 'none',
@@ -54,6 +56,7 @@ export function ProProvider({ children }: { children: ReactNode }) {
   const [isPro, setIsProState] = useState(false);
   const [scansUsed, setScansUsed] = useState(0);
   const [activeFeaturePaywall, setActiveFeaturePaywall] = useState<ProEntitlement | null>(null);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [subscriptionPlan, setSubscriptionPlan] = useState<'annual' | 'monthly' | 'none'>('none');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -147,10 +150,12 @@ export function ProProvider({ children }: { children: ReactNode }) {
 
   const openPaywallFor = (feature?: ProEntitlement) => {
     setActiveFeaturePaywall(feature ?? null);
+    setIsPaywallOpen(true);
   };
 
   const closePaywall = () => {
     setActiveFeaturePaywall(null);
+    setIsPaywallOpen(false);
   };
 
   return React.createElement(
@@ -166,6 +171,7 @@ export function ProProvider({ children }: { children: ReactNode }) {
         useScan,
         hasEntitlement,
         activeFeaturePaywall,
+        isPaywallOpen,
         openPaywallFor,
         closePaywall,
         subscriptionPlan,

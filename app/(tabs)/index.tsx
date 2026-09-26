@@ -24,6 +24,7 @@ import { usePro, useInventory, useImpact, useXp, useProfile, useMealPlan, useWee
 import { computeLevel, computeWeeklyGoal } from '@/lib/features';
 import { summarizeImpact } from '@/lib/impact';
 import { InventoryRow } from '@/lib/types';
+import { PaywallModal } from '@/components/PaywallModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -39,6 +40,7 @@ export default function TodayScreen() {
   const toast = useToast();
 
   const { isPro, openPaywallFor } = usePro();
+  const [paywallVisible, setPaywallVisible] = useState(false);
   const { items, reload: reloadInventory } = useInventory();
   const { xp, addXp } = useXp();
   const { log } = useImpact();
@@ -195,8 +197,18 @@ export default function TodayScreen() {
             </View>
 
             <TouchableOpacity
-              onPress={() => (isPro ? router.push('/(tabs)/profile') : openPaywallFor())}
+              onPress={() => {
+                hapticTap();
+                if (isPro) {
+                  router.push('/(tabs)/profile');
+                } else {
+                  setPaywallVisible(true);
+                  openPaywallFor();
+                }
+              }}
               style={{ paddingTop: 6 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel={isPro ? 'Pro VIP account active' : 'Unlock Nourish Pro'}
             >
@@ -411,6 +423,12 @@ export default function TodayScreen() {
           </SurfaceCard>
         </FadeInStagger>
       </ScrollView>
+
+      {/* ── Nourish Pro Paywall Modal ── */}
+      <PaywallModal
+        visible={paywallVisible}
+        onClose={() => setPaywallVisible(false)}
+      />
     </View>
   );
 }
