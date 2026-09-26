@@ -2,6 +2,7 @@
 # instead of using local dirty/untracked native folders
 android/
 ios/
+android_local_backup/
 
 # other typical ignores
 node_modules/
