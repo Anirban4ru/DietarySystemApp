@@ -434,16 +434,9 @@ export default function InventoryScreen() {
 
       {/* ── MANUAL ADD MODAL ── */}
       {addModalVisible && (
-        <Modal transparent animationType="slide" visible={addModalVisible}>
+        <Modal transparent animationType="slide" visible={addModalVisible} statusBarTranslucent onRequestClose={() => setAddModalVisible(false)}>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View
-              style={[
-                styles.modalBackdrop,
-                Platform.OS === 'android' && keyboardHeight > 0
-                  ? { paddingBottom: keyboardHeight }
-                  : null,
-              ]}
-            >
+            <View style={styles.modalBackdrop}>
               <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ width: '100%', alignItems: 'center' }}

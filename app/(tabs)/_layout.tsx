@@ -25,19 +25,19 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: isDark ? '#BF9861' : '#02332D',
-        tabBarInactiveTintColor: isDark ? 'rgba(218, 207, 189, 0.5)' : '#594E42',
+        tabBarActiveTintColor: '#02332D',
+        tabBarInactiveTintColor: '#594E42',
         tabBarStyle: {
-          backgroundColor: isDark ? '#081210' : '#EFE8DC',
+          backgroundColor: '#EFE8DC',
           borderTopWidth: 1,
-          borderTopColor: isDark ? 'rgba(191, 152, 97, 0.18)' : 'rgba(2, 51, 45, 0.1)',
+          borderTopColor: 'rgba(2, 51, 45, 0.1)',
           height: tabBarHeight,
           paddingBottom: Math.max(insets.bottom, 10),
           paddingTop: 8,
           elevation: 16,
           shadowColor: palette.ink,
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: isDark ? 0.35 : 0.04,
+          shadowOpacity: 0.04,
           shadowRadius: 12,
         },
         tabBarLabelStyle: {

@@ -14,7 +14,6 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import {
   Plus,
   X,
@@ -387,6 +386,20 @@ const ShoppingItemRow = React.memo(function ShoppingItemRow({
   );
 });
 
+// ─── Popular Pantry Staples for zero-query quick adds ───────────
+const POPULAR_STAPLES = [
+  { name: 'Whole Milk', category: 'dairy' },
+  { name: 'Fresh Eggs', category: 'dairy' },
+  { name: 'Sourdough Bread', category: 'bakery' },
+  { name: 'Baby Spinach', category: 'produce' },
+  { name: 'Extra Virgin Olive Oil', category: 'pantry' },
+  { name: 'Rolled Oats', category: 'pantry' },
+  { name: 'Chicken Breast', category: 'meat' },
+  { name: 'Greek Yogurt', category: 'dairy' },
+  { name: 'Bananas', category: 'produce' },
+  { name: 'Jasmine Rice', category: 'grains' },
+];
+
 // ─── Add Grocery Modal ───────────────────────────────────────────
 interface AddShoppingModalProps {
   visible: boolean;
@@ -396,7 +409,7 @@ interface AddShoppingModalProps {
 
 function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
   const { colors, mode } = useTheme();
-  const keyboardHeight = useKeyboardHeight();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ name: string; category: string }[]>([]);
   const [searching, setSearching] = useState(false);
@@ -434,147 +447,163 @@ function AddShoppingModal({ visible, onClose, onAdd }: AddShoppingModalProps) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View
-          style={[
-            styles.modalOverlay,
-            Platform.OS === 'android' && keyboardHeight > 0
-              ? { paddingBottom: keyboardHeight }
-              : null,
-          ]}
-        >
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={{ width: '100%' }}
           >
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View
-                style={[
-                  styles.modalSheet,
-                  { backgroundColor: colors.surface },
-                  keyboardHeight > 0 ? { maxHeight: '92%' } : null,
-                ]}
-              >
-          <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+              <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+                <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
 
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Grocery Item</Text>
-              <Text style={[styles.modalSub, { color: colors.subText }]}>
-                Search pantry staples or custom ingredients
-              </Text>
-            </View>
-            <IconButton
-              icon={<X size={18} color={colors.text} strokeWidth={2.5} />}
-              onPress={onClose}
-              accessibilityLabel="Close modal"
-              size={36}
-            />
-          </View>
-
-          {/* Search Input */}
-          <View
-            style={[
-              styles.searchBarWrap,
-              { backgroundColor: colors.bg, borderColor: colors.border },
-            ]}
-          >
-            <Search size={18} color={colors.subText} strokeWidth={2} style={{ marginRight: 8 }} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search or add grocery item"
-              placeholderTextColor={colors.subText}
-              value={query}
-              onChangeText={handleSearch}
-              autoCapitalize="words"
-              returnKeyType="done"
-            />
-            {query.length > 0 && (
-              <TouchableOpacity
-                onPress={() => handleSearch('')}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <X size={16} color={colors.subText} strokeWidth={2} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Results / Quick add */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: keyboardHeight > 0 ? 80 : 160,
-              maxHeight: keyboardHeight > 0 ? 150 : 260,
-              marginTop: spacing[3],
-            }}
-          >
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {results.length > 0 ? (
-                <View style={{ gap: 6 }}>
-                  {results.map((item, idx) => (
-                    <PressableScale
-                      key={idx}
-                      onPress={() => handlePick(item.name, item.category)}
-                      style={[
-                        styles.resultRow,
-                        { backgroundColor: colors.bg, borderColor: colors.border },
-                      ]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.resultName, { color: colors.text }]}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.resultCategory, { color: colors.subText }]}>
-                          {(CATEGORY_LABELS as any)[item.category] || item.category}
-                        </Text>
-                      </View>
-                      <Plus size={16} color={palette.forestDeep} strokeWidth={2.5} />
-                    </PressableScale>
-                  ))}
-                </View>
-              ) : query.trim().length >= 2 ? (
-                <PressableScale
-                  onPress={() => handlePick(query.trim(), 'other')}
-                  style={[
-                    styles.resultRow,
-                    {
-                      backgroundColor:
-                        mode === 'dark' ? 'rgba(2, 51, 45, 0.2)' : 'rgba(2, 51, 45, 0.08)',
-                      borderColor: palette.forestDeep,
-                    },
-                  ]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.resultName, { color: palette.forestDeep }]}>
-                      Add &ldquo;{query.trim()}&rdquo;
-                    </Text>
-                    <Text style={[styles.resultCategory, { color: colors.subText }]}>
-                      Custom grocery item
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>Add Grocery Item</Text>
+                    <Text style={[styles.modalSub, { color: colors.subText }]}>
+                      Search pantry staples or custom ingredients
                     </Text>
                   </View>
-                  <Plus size={16} color={palette.forestDeep} strokeWidth={2.5} />
-                </PressableScale>
-              ) : (
-                <View style={styles.promptWrap}>
-                  <Layers size={22} color={colors.subText} strokeWidth={1.8} />
-                  <Text style={[styles.promptText, { color: colors.subText }]}>
-                    Type to search grocery catalog or add custom item
-                  </Text>
+                  <IconButton
+                    icon={<X size={18} color={colors.text} strokeWidth={2.5} />}
+                    onPress={onClose}
+                    accessibilityLabel="Close modal"
+                    size={36}
+                  />
                 </View>
-              )}
-            </ScrollView>
-          </View>
 
-          {/* Quick Add Custom Button */}
-          {query.trim().length > 0 && (
-            <PrimaryAction
-              label={`Add "${query.trim()}"`}
-              onPress={() => handlePick(query.trim(), 'other')}
-              icon={<Plus size={18} color={palette.chalk} strokeWidth={2.5} />}
-              style={{ marginTop: spacing[3] }}
-            />
-          )}
+                {/* Search Input */}
+                <View
+                  style={[
+                    styles.searchBarWrap,
+                    { backgroundColor: colors.bg, borderColor: colors.border },
+                  ]}
+                >
+                  <Search size={18} color={colors.subText} strokeWidth={2} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={[styles.searchInput, { color: colors.text }]}
+                    placeholder="Search or add grocery item"
+                    placeholderTextColor={colors.subText}
+                    value={query}
+                    onChangeText={handleSearch}
+                    autoCapitalize="words"
+                    returnKeyType="done"
+                  />
+                  {query.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => handleSearch('')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <X size={16} color={colors.subText} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Results / Staples Quick Add Area */}
+                <View style={{ flexShrink: 1, maxHeight: 250, marginTop: spacing[3] }}>
+                  <Text style={[type.labelSm, { color: colors.subText, letterSpacing: 0.8, marginBottom: 8 }]}>
+                    {searching
+                      ? 'SEARCHING CATALOG...'
+                      : query.trim().length > 0
+                      ? 'MATCHING INGREDIENTS'
+                      : 'POPULAR PANTRY STAPLES'}
+                  </Text>
+
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ gap: 6, paddingBottom: 6 }}
+                  >
+                    {results.length > 0 ? (
+                      results.map((item, idx) => (
+                        <PressableScale
+                          key={idx}
+                          onPress={() => handlePick(item.name, item.category)}
+                          style={[
+                            styles.resultRow,
+                            { backgroundColor: colors.bg, borderColor: colors.border },
+                          ]}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.resultName, { color: colors.text }]}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.resultCategory, { color: colors.subText }]}>
+                              {(CATEGORY_LABELS as any)[item.category] || item.category}
+                            </Text>
+                          </View>
+                          <Plus size={16} color={palette.forestDeep} strokeWidth={2.5} />
+                        </PressableScale>
+                      ))
+                    ) : query.trim().length >= 2 ? (
+                      <PressableScale
+                        onPress={() => handlePick(query.trim(), 'other')}
+                        style={[
+                          styles.resultRow,
+                          {
+                            backgroundColor: 'rgba(2, 51, 45, 0.08)',
+                            borderColor: palette.forestDeep,
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.resultName, { color: palette.forestDeep }]}>
+                            Add &ldquo;{query.trim()}&rdquo;
+                          </Text>
+                          <Text style={[styles.resultCategory, { color: colors.subText }]}>
+                            Custom grocery item
+                          </Text>
+                        </View>
+                        <Plus size={16} color={palette.forestDeep} strokeWidth={2.5} />
+                      </PressableScale>
+                    ) : (
+                      POPULAR_STAPLES.map((item, idx) => (
+                        <PressableScale
+                          key={idx}
+                          onPress={() => handlePick(item.name, item.category)}
+                          style={[
+                            styles.resultRow,
+                            { backgroundColor: colors.bg, borderColor: colors.border },
+                          ]}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.resultName, { color: colors.text }]}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.resultCategory, { color: colors.subText }]}>
+                              {(CATEGORY_LABELS as any)[item.category] || item.category}
+                            </Text>
+                          </View>
+                          <Plus size={16} color={palette.forestDeep} strokeWidth={2.5} />
+                        </PressableScale>
+                      ))
+                    )}
+                  </ScrollView>
+                </View>
+
+                {/* Pinned Action Footer */}
+                <View style={{ paddingTop: spacing[3], paddingBottom: Math.max(insets.bottom, 16) + 6 }}>
+                  {query.trim().length > 0 ? (
+                    <PrimaryAction
+                      label={`Add "${query.trim()}"`}
+                      onPress={() => handlePick(query.trim(), 'other')}
+                      icon={<Plus size={18} color={palette.chalk} strokeWidth={2.5} />}
+                    />
+                  ) : (
+                    <SecondaryAction
+                      label="Close"
+                      onPress={onClose}
+                    />
+                  )}
+                </View>
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
@@ -684,15 +713,14 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
   },
   modalSheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: spacing[5],
-    paddingBottom: 40,
     paddingTop: 12,
-    maxHeight: '80%',
+    maxHeight: '92%',
   },
   modalHandle: {
     width: 44,

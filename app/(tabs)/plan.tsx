@@ -13,7 +13,6 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import {
   Calendar,
   Plus,
@@ -661,7 +660,7 @@ interface AddMealModalProps {
 
 function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMealModalProps) {
   const { colors, mode } = useTheme();
-  const keyboardHeight = useKeyboardHeight();
+  const insets = useSafeAreaInsets();
   const [meal, setMeal] = useState<MealType>(initialMeal);
   const [recipe, setRecipe] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>(CURATED_SUGGESTIONS);
@@ -696,172 +695,161 @@ function AddMealModal({ visible, dayName, initialMeal, onClose, onAdd }: AddMeal
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View
-          style={[
-            styles.modalOverlay,
-            Platform.OS === 'android' && keyboardHeight > 0
-              ? { paddingBottom: keyboardHeight }
-              : null,
-          ]}
-        >
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={{ width: '100%' }}
           >
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View
-                style={[
-                  styles.modalSheet,
-                  { backgroundColor: colors.surface },
-                  keyboardHeight > 0 ? { maxHeight: '92%' } : null,
-                ]}
-              >
-          <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+              <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+                <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
 
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Planned Meal</Text>
-              <Text style={[styles.modalSub, { color: colors.subText }]}>
-                Scheduling for {dayName}
-              </Text>
-            </View>
-            <IconButton
-              icon={<X size={18} color={colors.text} strokeWidth={2.5} />}
-              onPress={onClose}
-              accessibilityLabel="Close modal"
-              size={36}
-            />
-          </View>
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>Add Planned Meal</Text>
+                    <Text style={[styles.modalSub, { color: colors.subText }]}>
+                      Scheduling for {dayName}
+                    </Text>
+                  </View>
+                  <IconButton
+                    icon={<X size={18} color={colors.text} strokeWidth={2.5} />}
+                    onPress={onClose}
+                    accessibilityLabel="Close modal"
+                    size={36}
+                  />
+                </View>
 
-          {/* Meal Type Selector */}
-          <Text style={[styles.fieldHeader, { color: colors.subText }]}>MEAL TIME</Text>
-          <View style={styles.mealTypeRow}>
-            {MEAL_TYPES.map((m) => {
-              const isSelected = meal === m;
-              return (
-                <PressableScale
-                  key={m}
-                  onPress={() => {
-                    hapticSelection();
-                    setMeal(m);
-                  }}
-                  style={[
-                    styles.mealTypeOption,
-                    {
-                      backgroundColor: isSelected ? palette.forestDeep : colors.bg,
-                      borderColor: isSelected ? palette.forestDeep : colors.border,
-                    },
-                  ]}
-                  accessibilityLabel={`Select ${m}`}
-                >
-                  <Text
-                    style={[
-                      styles.mealTypeOptionText,
-                      { color: isSelected ? palette.chalk : colors.text },
-                    ]}
-                  >
-                    {m}
-                  </Text>
-                </PressableScale>
-              );
-            })}
-          </View>
-
-          {/* Recipe Name Search */}
-          <Text style={[styles.fieldHeader, { color: colors.subText, marginTop: spacing[4] }]}>
-            RECIPE OR DISH NAME
-          </Text>
-          <View
-            style={[
-              styles.searchBarWrap,
-              { backgroundColor: colors.bg, borderColor: colors.border },
-            ]}
-          >
-            <Search size={18} color={colors.subText} strokeWidth={2} style={{ marginRight: 8 }} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search or plan a meal"
-              placeholderTextColor={colors.subText}
-              value={recipe}
-              onChangeText={handleSearch}
-              autoCapitalize="words"
-              returnKeyType="done"
-            />
-            {recipe.length > 0 && (
-              <PressableScale onPress={() => handleSearch('')} hitSlop={8}>
-                <X size={16} color={colors.subText} strokeWidth={2} />
-              </PressableScale>
-            )}
-          </View>
-
-          {/* Suggestions List */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: keyboardHeight > 0 ? 80 : 140,
-              maxHeight: keyboardHeight > 0 ? 130 : 200,
-              marginTop: spacing[3],
-            }}
-          >
-            <Text style={[styles.fieldHeader, { color: colors.subText, marginBottom: 8 }]}>
-              {searching ? 'SEARCHING AI IDEAS...' : 'CURATED & INGREDIENT INSPIRATION'}
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View style={{ gap: 6 }}>
-                {suggestions.map((suggestionName, idx) => {
-                  const isChosen = recipe.toLowerCase() === suggestionName.toLowerCase();
-                  return (
-                    <PressableScale
-                      key={`${suggestionName}-${idx}`}
-                      onPress={() => {
-                        hapticSelection();
-                        setRecipe(suggestionName);
-                      }}
-                      style={[
-                        styles.suggestionItem,
-                        {
-                          backgroundColor: isChosen
-                            ? mode === 'dark'
-                              ? 'rgba(2, 51, 45, 0.25)'
-                              : 'rgba(2, 51, 45, 0.08)'
-                            : colors.bg,
-                          borderColor: isChosen ? palette.forestDeep : colors.border,
-                        },
-                      ]}
-                    >
-                      <ChefHat
-                        size={14}
-                        color={isChosen ? palette.forestDeep : colors.subText}
-                        strokeWidth={2}
-                      />
-                      <Text
+                {/* Meal Type Selector */}
+                <Text style={[styles.fieldHeader, { color: colors.subText }]}>MEAL TIME</Text>
+                <View style={styles.mealTypeRow}>
+                  {MEAL_TYPES.map((m) => {
+                    const isSelected = meal === m;
+                    return (
+                      <PressableScale
+                        key={m}
+                        onPress={() => {
+                          hapticSelection();
+                          setMeal(m);
+                        }}
                         style={[
-                          styles.suggestionText,
+                          styles.mealTypeOption,
                           {
-                            color: isChosen ? palette.forestDeep : colors.text,
-                            fontFamily: isChosen ? font.sansBold : font.sans,
+                            backgroundColor: isSelected ? palette.forestDeep : colors.bg,
+                            borderColor: isSelected ? palette.forestDeep : colors.border,
                           },
                         ]}
+                        accessibilityLabel={`Select ${m}`}
                       >
-                        {suggestionName}
-                      </Text>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
+                        <Text
+                          style={[
+                            styles.mealTypeOptionText,
+                            { color: isSelected ? palette.chalk : colors.text },
+                          ]}
+                        >
+                          {m}
+                        </Text>
+                      </PressableScale>
+                    );
+                  })}
+                </View>
 
-          {/* Confirm Button */}
-          <PrimaryAction
-            label={`Confirm ${meal} Schedule`}
-            onPress={() => onAdd(meal, recipe.trim() || 'Daily Balanced Plate')}
-            icon={<Check size={18} color={palette.chalk} strokeWidth={2.5} />}
-            style={{ marginTop: spacing[4] }}
-          />
+                {/* Recipe Name Search */}
+                <Text style={[styles.fieldHeader, { color: colors.subText, marginTop: spacing[3] }]}>
+                  RECIPE OR DISH NAME
+                </Text>
+                <View
+                  style={[
+                    styles.searchBarWrap,
+                    { backgroundColor: colors.bg, borderColor: colors.border },
+                  ]}
+                >
+                  <Search size={18} color={colors.subText} strokeWidth={2} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={[styles.searchInput, { color: colors.text }]}
+                    placeholder="Search or plan a meal"
+                    placeholderTextColor={colors.subText}
+                    value={recipe}
+                    onChangeText={handleSearch}
+                    autoCapitalize="words"
+                    returnKeyType="done"
+                  />
+                  {recipe.length > 0 && (
+                    <PressableScale onPress={() => handleSearch('')} hitSlop={8}>
+                      <X size={16} color={colors.subText} strokeWidth={2} />
+                    </PressableScale>
+                  )}
+                </View>
+
+                {/* Suggestions List */}
+                <View style={{ flexShrink: 1, maxHeight: 180, marginTop: spacing[2] }}>
+                  <Text style={[styles.fieldHeader, { color: colors.subText, marginBottom: 6 }]}>
+                    {searching ? 'SEARCHING AI IDEAS...' : 'CURATED & INGREDIENT INSPIRATION'}
+                  </Text>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ gap: 6, paddingBottom: 4 }}
+                  >
+                    {suggestions.map((suggestionName, idx) => {
+                      const isChosen = recipe.toLowerCase() === suggestionName.toLowerCase();
+                      return (
+                        <PressableScale
+                          key={`${suggestionName}-${idx}`}
+                          onPress={() => {
+                            hapticSelection();
+                            setRecipe(suggestionName);
+                          }}
+                          style={[
+                            styles.suggestionItem,
+                            {
+                              backgroundColor: isChosen
+                                ? mode === 'dark'
+                                  ? 'rgba(2, 51, 45, 0.25)'
+                                  : 'rgba(2, 51, 45, 0.08)'
+                                : colors.bg,
+                              borderColor: isChosen ? palette.forestDeep : colors.border,
+                            },
+                          ]}
+                        >
+                          <ChefHat
+                            size={14}
+                            color={isChosen ? palette.forestDeep : colors.subText}
+                            strokeWidth={2}
+                          />
+                          <Text
+                            style={[
+                              styles.suggestionText,
+                              {
+                                color: isChosen ? palette.forestDeep : colors.text,
+                                fontFamily: isChosen ? font.sansBold : font.sans,
+                              },
+                            ]}
+                          >
+                            {suggestionName}
+                          </Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Pinned Confirm Button with Safe Area Padding */}
+                <View style={{ paddingTop: spacing[3], paddingBottom: Math.max(insets.bottom, 16) + 6 }}>
+                  <PrimaryAction
+                    label={`Confirm ${meal} Schedule`}
+                    onPress={() => onAdd(meal, recipe.trim() || 'Daily Balanced Plate')}
+                    icon={<Check size={18} color={palette.chalk} strokeWidth={2.5} />}
+                  />
+                </View>
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
@@ -1112,15 +1100,14 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
   },
   modalSheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: spacing[5],
-    paddingBottom: 40,
     paddingTop: 12,
-    maxHeight: '85%',
+    maxHeight: '92%',
   },
   modalHandle: {
     width: 44,
