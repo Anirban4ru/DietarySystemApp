@@ -48,7 +48,7 @@ export default function LoginScreen() {
     );
   };
 
-  // Sign in existing user (Zero lag, instant smooth feedback, single error message)
+  // Sign in existing user strictly with Supabase authentication
   async function handleSignIn() {
     if (!email.trim() || !password) {
       show('Please enter both email and password.', 'error');
@@ -62,33 +62,24 @@ export default function LoginScreen() {
         password,
       });
 
-      if (!error && data?.session) {
+      if (error) {
+        show(error.message || 'Invalid email or password. Please verify your credentials.', 'error');
+        setLoading(false);
+        return;
+      }
+
+      if (data?.session) {
         await AsyncStorage.setItem('@nourish_session', JSON.stringify(data.session));
         show('Welcome back to Nourish!', 'success');
         setLoading(false);
         router.replace('/(tabs)');
         return;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('[Supabase signIn]', e);
+      show(e?.message || 'Authentication failed. Please check your credentials.', 'error');
     }
 
-    // Check offline/local session fallback
-    const savedSession = await AsyncStorage.getItem('@nourish_session');
-    if (savedSession) {
-      try {
-        const parsed = JSON.parse(savedSession);
-        if (parsed?.user?.email?.toLowerCase() === email.trim().toLowerCase()) {
-          show('Welcome back to Nourish!', 'success');
-          setLoading(false);
-          router.replace('/(tabs)');
-          return;
-        }
-      } catch {}
-    }
-
-    // Single unified error message for security (prevents user enumeration)
-    show('Invalid email or password. Please verify your credentials.', 'error');
     setLoading(false);
   }
 
@@ -162,10 +153,31 @@ export default function LoginScreen() {
         },
       });
 
-      if (!error && data?.user) {
-        userId = data.user.id;
-        userEmail = data.user.email || email.trim();
-        await supabase.from('user_profile').upsert({
+      if (error) {
+        show(error.message, 'error');
+        setLoading(false);
+        return;
+      }
+
+      if (data?.user) {
+        try {
+          await supabase.from('user_profile').upsert({
+            user_id: data.user.id,
+            name: fullName.trim(),
+            age: parsedAge,
+            sex,
+            weight_kg: parsedWeight,
+            height_cm: parsedHeight,
+            activity_level: 'moderate',
+            conditions: selectedConditions,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (dbErr) {
+          console.warn('[Profile Creation]', dbErr);
+        }
+
+        const localProfile = {
+          id: data.user.id,
           user_id: data.user.id,
           name: fullName.trim(),
           age: parsedAge,
@@ -175,41 +187,27 @@ export default function LoginScreen() {
           activity_level: 'moderate',
           conditions: selectedConditions,
           updated_at: new Date().toISOString(),
-        });
+        };
+        await AsyncStorage.setItem(`@nourish_user_profile_${data.user.id}`, JSON.stringify(localProfile));
+        await AsyncStorage.setItem('@nourish_onboarding_done', 'true');
+
+        if (data.session) {
+          await AsyncStorage.setItem('@nourish_session', JSON.stringify(data.session));
+          show(`Welcome, ${fullName.trim()}! Workspace ready.`, 'success');
+          setLoading(false);
+          router.replace('/(tabs)');
+          return;
+        } else {
+          show('Account created! Please check your email to verify, then sign in.', 'success');
+          setAuthMode('signin');
+          setLoading(false);
+          return;
+        }
       }
-    } catch (dbErr) {
-      console.warn('[Profile Creation]', dbErr);
+    } catch (e: any) {
+      show(e?.message || 'Failed to create account. Please try again.', 'error');
     }
-
-    const localUser = {
-      id: userId,
-      email: userEmail,
-      user_metadata: {
-        full_name: fullName.trim(),
-        name: fullName.trim(),
-      },
-    };
-
-    const localProfile = {
-      id: userId,
-      user_id: userId,
-      name: fullName.trim(),
-      age: parsedAge,
-      sex,
-      weight_kg: parsedWeight,
-      height_cm: parsedHeight,
-      activity_level: 'moderate',
-      conditions: selectedConditions,
-      updated_at: new Date().toISOString(),
-    };
-
-    await AsyncStorage.setItem('@nourish_session', JSON.stringify({ user: localUser, access_token: 'local_token' }));
-    await AsyncStorage.setItem('@nourish_user_profile', JSON.stringify(localProfile));
-    await AsyncStorage.setItem('@nourish_onboarding_done', 'true');
-
-    show(`Welcome, ${fullName.trim()}! Workspace ready.`, 'success');
     setLoading(false);
-    router.replace('/(tabs)');
   }
 
   return (

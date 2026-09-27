@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.anirban.logbox",
+      "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.CAMERA",

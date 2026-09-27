@@ -109,7 +109,6 @@ export default function ProfileScreen() {
   const [saved, setSaved] = useState(false);
   const [goalsExpanded, setGoalsExpanded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ email?: string; id?: string } | null>(null);
   const [showTerms, setShowTerms] = useState(false);
@@ -183,19 +182,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleExportJson = async () => {
-    hapticTap();
-    setExporting(true);
-    setTimeout(() => {
-      setExporting(false);
-      Alert.alert(
-        'Data Export Package',
-        `Prepared complete raw JSON snapshot:\n• ${items.length} inventory records\n• ${summary.mealsRescued} logged rescue events\n• Nutritional RDA profiles\n• Clinical biometric data`,
-        [{ text: 'Done', style: 'default' }]
-      );
-    }, 400);
-  };
-
   const handleClearCache = async () => {
     hapticWarning();
     Alert.alert(
@@ -210,7 +196,7 @@ export default function ProfileScreen() {
             try {
               const keys = await AsyncStorage.getAllKeys();
               const nonCritical = keys.filter(
-                (k) => !k.includes('auth') && !k.includes('supabase')
+                (k) => !k.includes('auth') && !k.includes('supabase') && k !== '@nourish_session'
               );
               await AsyncStorage.multiRemove(nonCritical);
               toast.show('Local cache cleared', 'success');
@@ -223,29 +209,40 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleLogout = async () => {
-    hapticHeavy();
-    if (!currentUser) {
-      router.push('/login');
-      return;
-    }
-    try {
-      const keys = await AsyncStorage.getAllKeys();
-      const userCacheKeys = keys.filter(
-        (k) => k.startsWith('@nourish_') && currentUser.id && k.includes(currentUser.id)
-      );
-      if (userCacheKeys.length > 0) {
-        await AsyncStorage.multiRemove(userCacheKeys);
-      }
-    } catch (e) {
-      console.warn('Failed to purge local storage on logout', e);
-    }
-    await AsyncStorage.removeItem('@nourish_session');
-    await AsyncStorage.removeItem('@nourish_user_profile');
-    await supabase.auth.signOut();
-    setCurrentUser(null);
-    toast.show('Signed out successfully', 'info');
-    router.replace('/login');
+  const handleLogout = () => {
+    hapticWarning();
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of Nourish?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase.auth.signOut();
+            } catch (e) {
+              console.warn('Supabase signOut error', e);
+            }
+            try {
+              const keys = await AsyncStorage.getAllKeys();
+              const toRemove = keys.filter(
+                (k) => k.startsWith('@nourish') || k.includes('supabase')
+              );
+              if (toRemove.length > 0) {
+                await AsyncStorage.multiRemove(toRemove);
+              }
+            } catch (e) {
+              console.warn('Storage purge error', e);
+            }
+            setCurrentUser(null);
+            toast.show('Signed out successfully', 'info');
+            router.replace('/login');
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteAccount = () => {
@@ -296,21 +293,27 @@ export default function ProfileScreen() {
           title="Account & Wellness"
           subtitle="Biometrics, dietary restrictions, and subscriptions"
           rightAction={
-            <IconButton
-              icon={
-                isDark ? (
-                  <Sun size={20} color={palette.chalk} strokeWidth={2.2} />
-                ) : (
-                  <Moon size={20} color={palette.ink} strokeWidth={2.2} />
-                )
-              }
-              onPress={() => {
-                hapticTap();
-                toggle();
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: 'rgba(127, 17, 0, 0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(127, 17, 0, 0.25)',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 20,
               }}
-              accessibilityLabel={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              size={40}
-            />
+              accessibilityRole="button"
+              accessibilityLabel="Sign out of your account"
+            >
+              <LogOut size={15} color={palette.burgundy} strokeWidth={2.4} />
+              <Text style={{ fontSize: 13, fontFamily: font.sansBold, color: palette.burgundy }}>
+                Sign Out
+              </Text>
+            </TouchableOpacity>
           }
         />
 
@@ -387,48 +390,6 @@ export default function ProfileScreen() {
               onPress={handleRestorePurchases}
               size="sm"
               style={{ minWidth: 84 }}
-            />
-          </View>
-        </SurfaceCard>
-
-        {/* ── Demo Pro Mode Toggle ─────────────────────────────────────────────
-            For testing the Pro experience without a real purchase.
-            This flips only the local AsyncStorage flag — not a real subscription.
-        ──────────────────────────────────────────────────────────────────────── */}
-        <SurfaceCard style={[styles.sectionCard, { borderColor: isPro ? palette.saffron : colors.border, borderWidth: isPro ? 1.5 : 1 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, paddingRight: spacing[3] }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Text style={[styles.sectionHeading, { color: colors.text, marginBottom: 0 }]}>
-                  Demo Pro Mode
-                </Text>
-                <View style={{
-                  backgroundColor: 'rgba(191, 152, 97, 0.15)',
-                  borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-                }}>
-                  <Text style={{ fontSize: 9, fontFamily: font.sansBold, color: palette.saffron, letterSpacing: 0.8 }}>
-                    DEMO ONLY
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.sectionSub, { color: colors.subText }]}>
-                {isPro
-                  ? 'Pro features unlocked for testing. AI Chef, unlimited scans, and advanced analytics are active.'
-                  : 'Toggle to simulate the Pro experience locally. Flip off to return to free tier.'}
-              </Text>
-            </View>
-            <Switch
-              value={isPro}
-              onValueChange={(val) => {
-                hapticTap();
-                setIsPro(val);
-                toast.show(
-                  val ? '✨ Pro mode enabled (demo)' : 'Returned to free tier',
-                  val ? 'success' : 'info',
-                );
-              }}
-              thumbColor={isPro ? palette.chalk : colors.border}
-              trackColor={{ false: colors.border, true: palette.forestDeep }}
             />
           </View>
         </SurfaceCard>
@@ -862,17 +823,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={handleExportJson}
-              style={[styles.accountActionBtn, { borderColor: colors.border }]}
-              activeOpacity={0.7}
-            >
-              <Download size={18} color={colors.text} strokeWidth={2} />
-              <Text style={[styles.accountActionText, { color: colors.text }]}>
-                {exporting ? 'Preparing JSON...' : 'Export Raw Data (.JSON)'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
               onPress={handleClearCache}
               style={[styles.accountActionBtn, { borderColor: colors.border }]}
               activeOpacity={0.7}
@@ -905,29 +855,19 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
 
-            {currentUser ? (
-              <TouchableOpacity
-                onPress={handleLogout}
-                style={[styles.accountActionBtn, { borderColor: colors.border }]}
-                activeOpacity={0.7}
-              >
-                <LogOut size={18} color={colors.text} strokeWidth={2} />
-                <Text style={[styles.accountActionText, { color: colors.text }]}>
-                  Sign Out ({currentUser.email || 'Account'})
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={() => router.push('/login')}
-                style={[styles.accountActionBtn, { borderColor: palette.forestDeep, backgroundColor: 'rgba(2, 51, 45, 0.08)' }]}
-                activeOpacity={0.7}
-              >
-                <User size={18} color={palette.forestDeep} strokeWidth={2} />
-                <Text style={[styles.accountActionText, { color: palette.forestDeep, fontFamily: font.sansBold }]}>
-                  Sign In / Connect Supabase Account
-                </Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={[
+                styles.accountActionBtn,
+                { borderColor: 'rgba(127, 17, 0, 0.35)', backgroundColor: 'rgba(127, 17, 0, 0.05)' },
+              ]}
+              activeOpacity={0.7}
+            >
+              <LogOut size={18} color={palette.burgundy} strokeWidth={2.2} />
+              <Text style={[styles.accountActionText, { color: palette.burgundy, fontFamily: font.sansBold }]}>
+                Sign Out {currentUser?.email ? `(${currentUser.email})` : ''}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleDeleteAccount}

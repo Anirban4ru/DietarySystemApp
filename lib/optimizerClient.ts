@@ -143,7 +143,7 @@ function runLocalFallback(params: {
   }
 
   const defaultProfile: ProfileRow = params.profile ?? {
-    id: 'guest',
+    id: 'default',
     age: 28,
     sex: 'male',
     weight_kg: 70,

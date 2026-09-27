@@ -24,8 +24,8 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // THEME
 // ─────────────────────────────────────────────────────────────────
 
-type ThemeMode = 'light' | 'dark';
-interface ThemeCtx {
+export type ThemeMode = 'light' | 'dark';
+export interface ThemeCtx {
   mode: ThemeMode;
   toggle: () => void;
   colors: typeof palette & {
@@ -44,10 +44,10 @@ export function useTheme() {
       toggle: () => {},
       colors: {
         ...palette,
-        bg: palette.bone, surface: palette.chalk, surfaceElevated: palette.chalk,
+        bg: palette.bone, surface: palette.paper, surfaceElevated: palette.chalk,
         text: palette.ink, subText: palette.slate2,
-        border: palette.hair, borderDark: palette.hairLight,
-        paperBg: palette.paper, primaryAction: palette.sageDeep, cardBorder: palette.hair,
+        border: 'rgba(2, 51, 45, 0.08)', borderDark: palette.hairLight,
+        paperBg: '#EFE8DC', primaryAction: palette.royalGreen, cardBorder: 'rgba(2, 51, 45, 0.06)',
       },
     };
   }
@@ -55,40 +55,26 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>('light');
-
+  // Pure, elegant light theme locked permanently
   useEffect(() => {
-    AsyncStorage.getItem('theme_mode').then((val) => {
-      if (val === 'dark' || val === 'light') {
-        setMode(val);
-      } else {
-        // Default mode is strictly light mode
-        setMode('light');
-        AsyncStorage.setItem('theme_mode', 'light').catch(() => {});
-      }
-    });
+    AsyncStorage.removeItem('theme_mode').catch(() => {});
   }, []);
 
-  const toggle = () => {
-    setMode((m) => {
-      const next = m === 'light' ? 'dark' : 'light';
-      AsyncStorage.setItem('theme_mode', next);
-      return next;
-    });
-  };
+  const mode: ThemeMode = 'light';
+  const toggle = () => {};
 
   const colors = {
     ...palette,
-    bg:              mode === 'light' ? palette.bone        : palette.darkBg,
-    surface:         mode === 'light' ? palette.paper       : palette.darkSurface,
-    surfaceElevated: mode === 'light' ? palette.chalk       : '#142C27',
-    text:            mode === 'light' ? palette.ink         : palette.darkText,
-    subText:         mode === 'light' ? palette.slate2      : palette.darkMist,
-    border:          mode === 'light' ? 'rgba(2, 51, 45, 0.08)' : palette.darkBorder,
+    bg:              palette.bone,
+    surface:         palette.paper,
+    surfaceElevated: palette.chalk,
+    text:            palette.ink,
+    subText:         palette.slate2,
+    border:          'rgba(2, 51, 45, 0.08)',
     borderDark:      palette.hairLight,
-    paperBg:         mode === 'light' ? '#EFE8DC'           : '#0A1815',
+    paperBg:         '#EFE8DC',
     primaryAction:   palette.royalGreen,
-    cardBorder:      mode === 'light' ? 'rgba(2, 51, 45, 0.06)' : 'rgba(218, 207, 189, 0.1)',
+    cardBorder:      'rgba(2, 51, 45, 0.06)',
   };
 
   return <Ctx.Provider value={{ mode, toggle, colors }}>{children}</Ctx.Provider>;

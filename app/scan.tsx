@@ -388,14 +388,8 @@ export default function ScannerScreen() {
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => { hapticSelection(); toggle(); }}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle light/dark theme"
-          >
-            {mode === 'dark' ? <Sun size={20} color={palette.chalk} /> : <Moon size={20} color={palette.chalk} />}
-          </TouchableOpacity>
+          {/* Empty spacer for balanced header */}
+          <View style={{ width: 44 }} />
         </View>
 
         {/* Reticle Overlay */}

@@ -33,7 +33,7 @@ async function getStorageKey(): Promise<string> {
       return `@nourish_notification_preferences_${user.id}`;
     }
   } catch {}
-  return '@nourish_notification_preferences_guest';
+  return '@nourish_notification_preferences_default';
 }
 
 // Configure foreground display behavior

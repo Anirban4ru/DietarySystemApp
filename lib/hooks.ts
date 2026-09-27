@@ -64,15 +64,14 @@ export function ProProvider({ children }: { children: ReactNode }) {
   const loadUserProState = async (userId: string | null) => {
     setCurrentUserId(userId);
     if (!userId) {
-      const isGuestPro = (await AsyncStorage.getItem('@nourish_is_pro_guest')) === 'true';
-      setIsProState(isGuestPro);
+      setIsProState(false);
       setScansUsed(0);
       setSubscriptionPlan('none');
       return;
     }
 
     try {
-      // Check database and local demo state
+      // Check database and local user state
       const { data: profile } = await supabase
         .from('user_profile')
         .select('subscription_tier')
@@ -108,78 +107,74 @@ export function ProProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setIsPro = async (val: boolean) => {
+    if (!currentUserId) return;
     setIsProState(val);
-    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
+    const key = `@nourish_is_pro_${currentUserId}`;
     await AsyncStorage.setItem(key, val ? 'true' : 'false');
 
     // Sync to user profile if authenticated
-    if (currentUserId) {
-      try {
-        await supabase
-          .from('user_profile')
-          .update({ subscription_tier: val ? 'pro' : 'free' })
-          .eq('user_id', currentUserId);
-      } catch {}
-    }
+    try {
+      await supabase
+        .from('user_profile')
+        .update({ subscription_tier: val ? 'pro' : 'free' })
+        .eq('user_id', currentUserId);
+    } catch {}
   };
 
-  // Demo / In-app Pro unlock (works out of the box without requiring external payment gateway)
+  // In-app Pro unlock
   const unlockPro = async (plan: 'annual' | 'monthly' = 'annual') => {
+    if (!currentUserId) return;
     setIsProState(true);
     setSubscriptionPlan(plan);
-    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
-    const planKey = currentUserId ? `@nourish_sub_plan_${currentUserId}` : '@nourish_sub_plan_guest';
+    const key = `@nourish_is_pro_${currentUserId}`;
+    const planKey = `@nourish_sub_plan_${currentUserId}`;
     await AsyncStorage.setItem(key, 'true');
     await AsyncStorage.setItem(planKey, plan);
 
-    if (currentUserId) {
-      try {
-        await supabase
-          .from('user_profile')
-          .update({ subscription_tier: 'pro' })
-          .eq('user_id', currentUserId);
-      } catch {}
-    }
+    try {
+      await supabase
+        .from('user_profile')
+        .update({ subscription_tier: 'pro' })
+        .eq('user_id', currentUserId);
+    } catch {}
   };
 
   const resetPro = async () => {
+    if (!currentUserId) return;
     setIsProState(false);
     setSubscriptionPlan('none');
-    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
-    const planKey = currentUserId ? `@nourish_sub_plan_${currentUserId}` : '@nourish_sub_plan_guest';
+    const key = `@nourish_is_pro_${currentUserId}`;
+    const planKey = `@nourish_sub_plan_${currentUserId}`;
     await AsyncStorage.setItem(key, 'false');
     await AsyncStorage.setItem(planKey, 'none');
 
-    if (currentUserId) {
-      try {
-        await supabase
-          .from('user_profile')
-          .update({ subscription_tier: 'free' })
-          .eq('user_id', currentUserId);
-      } catch {}
-    }
+    try {
+      await supabase
+        .from('user_profile')
+        .update({ subscription_tier: 'free' })
+        .eq('user_id', currentUserId);
+    } catch {}
   };
 
   const restorePurchases = async (): Promise<boolean> => {
-    const key = currentUserId ? `@nourish_is_pro_${currentUserId}` : '@nourish_is_pro_guest';
+    if (!currentUserId) return false;
+    const key = `@nourish_is_pro_${currentUserId}`;
     const isLocalPro = (await AsyncStorage.getItem(key)) === 'true';
     if (isLocalPro) {
       setIsProState(true);
       return true;
     }
-    if (currentUserId) {
-      try {
-        const { data } = await supabase
-          .from('user_profile')
-          .select('subscription_tier')
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-        if (data?.subscription_tier === 'pro') {
-          setIsProState(true);
-          return true;
-        }
-      } catch {}
-    }
+    try {
+      const { data } = await supabase
+        .from('user_profile')
+        .select('subscription_tier')
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+      if (data?.subscription_tier === 'pro') {
+        setIsProState(true);
+        return true;
+      }
+    } catch {}
     return false;
   };
 
@@ -299,15 +294,9 @@ export function useInventory() {
       expires_at: expires, freshness_score: input.freshnessScore ?? 1, notes: input.notes ?? null
     };
     
-    // GUEST MODE STORAGE
     if (!user) {
-      setItems((prev) => {
-        const updated = [...prev, tempRow].sort((a, b) =>
-          (a.expires_at ?? '').localeCompare(b.expires_at ?? ''));
-        AsyncStorage.setItem('@nourish_guest_inventory', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
-      return tempRow;
+      console.warn('Cannot add inventory: user unauthenticated');
+      return null;
     }
 
     setItems((prev) => [...prev, tempRow].sort((a, b) =>
@@ -356,11 +345,7 @@ export function useInventory() {
   const remove = useCallback(async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      setItems((prev) => {
-        const filtered = prev.filter((i) => i.id !== id);
-        AsyncStorage.setItem('@nourish_guest_inventory', JSON.stringify(filtered)).catch(() => {});
-        return filtered;
-      });
+      console.warn('Cannot delete inventory: user unauthenticated');
       return;
     }
 
@@ -387,33 +372,24 @@ export function useProfile() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    // Instant zero-lag local profile load
-    try {
-      const local = await AsyncStorage.getItem('@nourish_user_profile');
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (parsed?.name) {
-          setProfile(parsed);
-        }
-      }
-    } catch {}
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        const local = await AsyncStorage.getItem('@nourish_user_profile');
-        if (local) {
-          try {
-            const parsed = JSON.parse(local);
-            if (parsed?.name) {
-              setProfile(parsed);
-              setLoading(false);
-              return;
-            }
-          } catch {}
-        }
+        setProfile(null);
         setLoading(false);
         return;
+      }
+
+      const userKey = `@nourish_user_profile_${user.id}`;
+      // Instant load user-specific cached profile
+      const local = await AsyncStorage.getItem(userKey);
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          if (parsed?.name) {
+            setProfile(parsed);
+          }
+        } catch {}
       }
 
       const { data } = await supabase
@@ -425,7 +401,7 @@ export function useProfile() {
 
       if (data) {
         setProfile(data as ProfileRow);
-        await AsyncStorage.setItem('@nourish_user_profile', JSON.stringify(data));
+        await AsyncStorage.setItem(userKey, JSON.stringify(data));
       } else {
         const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '';
         const defaultProfile: ProfileRow = {
@@ -440,7 +416,7 @@ export function useProfile() {
           updated_at: new Date().toISOString(),
         };
         setProfile(defaultProfile);
-        await AsyncStorage.setItem('@nourish_user_profile', JSON.stringify(defaultProfile));
+        await AsyncStorage.setItem(userKey, JSON.stringify(defaultProfile));
       }
     } catch (e) {
       console.warn('[useProfile load]', e);
@@ -457,16 +433,11 @@ export function useProfile() {
   const upsert = useCallback(async (p: Omit<ProfileRow, 'id' | 'updated_at'>) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      const updated: ProfileRow = {
-        id: profile?.id || 'guest-profile-id',
-        ...p,
-        updated_at: new Date().toISOString(),
-      };
-      setProfile(updated);
-      AsyncStorage.setItem('@nourish_guest_profile', JSON.stringify(updated)).catch(() => {});
+      console.warn('Cannot update profile: user not authenticated');
       return;
     }
 
+    const userKey = `@nourish_user_profile_${user.id}`;
     const existing = profile?.id;
     if (existing) {
       const { data, error } = await supabase
@@ -476,16 +447,22 @@ export function useProfile() {
         .eq('user_id', user.id)
         .select()
         .single();
-      if (!error) setProfile(data as ProfileRow);
+      if (!error && data) {
+        setProfile(data as ProfileRow);
+        await AsyncStorage.setItem(userKey, JSON.stringify(data));
+      }
     } else {
       const { data, error } = await supabase
         .from('user_profile')
         .insert({ ...p, user_id: user.id })
         .select()
         .single();
-      if (!error) setProfile(data as ProfileRow);
+      if (!error && data) {
+        setProfile(data as ProfileRow);
+        await AsyncStorage.setItem(userKey, JSON.stringify(data));
+      }
     }
-  }, [profile]);
+  }, [profile?.id]);
 
   return { profile, loading, reload: load, upsert };
 }
@@ -498,12 +475,7 @@ export function useImpact() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_impact');
-        setLog(stored ? JSON.parse(stored) : []);
-      } catch {
-        setLog([]);
-      }
+      setLog([]);
       setLoading(false);
       return;
     }
@@ -523,22 +495,7 @@ export function useImpact() {
 
   const logEvent = useCallback(async (event_type: ImpactLogRow['event_type'], co2e_kg: number, payload: Record<string, any>) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const newEntry: ImpactLogRow = {
-      id: 'impact-' + Crypto.randomUUID(),
-      event_type,
-      co2e_kg: +co2e_kg.toFixed(2),
-      payload,
-      created_at: new Date().toISOString(),
-    };
-
-    if (!user) {
-      setLog((prev) => {
-        const updated = [newEntry, ...prev];
-        AsyncStorage.setItem('@nourish_guest_impact', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
-      return;
-    }
+    if (!user) return;
 
     const { data } = await supabase
       .from('impact_log')
@@ -559,12 +516,7 @@ export function useDisposals() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_disposals');
-        setDisposals(stored ? JSON.parse(stored) : []);
-      } catch {
-        setDisposals([]);
-      }
+      setDisposals([]);
       setLoading(false);
       return;
     }
@@ -584,22 +536,7 @@ export function useDisposals() {
 
   const logDisposal = useCallback(async (item_name: string, category: FoodCategory, reason: DisposalRow['reason']) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const newEntry: DisposalRow = {
-      id: 'disp-' + Crypto.randomUUID(),
-      item_name,
-      category,
-      reason,
-      created_at: new Date().toISOString(),
-    };
-
-    if (!user) {
-      setDisposals((prev) => {
-        const updated = [newEntry, ...prev];
-        AsyncStorage.setItem('@nourish_guest_disposals', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
-      return;
-    }
+    if (!user) return;
 
     const { data } = await supabase
       .from('disposal_events')
@@ -620,12 +557,7 @@ export function useFavorites() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      try {
-        const stored = await AsyncStorage.getItem('@nourish_guest_favorites');
-        setFavs(stored ? JSON.parse(stored) : []);
-      } catch {
-        setFavs([]);
-      }
+      setFavs([]);
       setLoading(false);
       return;
     }
@@ -646,16 +578,7 @@ export function useFavorites() {
 
   const toggle = useCallback(async (recipeName: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setFavs((prev) => {
-        const updated = prev.includes(recipeName)
-          ? prev.filter((f) => f !== recipeName)
-          : [...prev, recipeName];
-        AsyncStorage.setItem('@nourish_guest_favorites', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
-      return;
-    }
+    if (!user) return;
 
     const wasFav = favs.includes(recipeName);
     // Optimistic UI update immediately
@@ -750,14 +673,7 @@ export function useShoppingList() {
     // Optimistic update immediately
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked } : i)));
 
-    if (!user) {
-      AsyncStorage.getItem('@nourish_guest_shopping').then((raw) => {
-        const prev: ShoppingItem[] = raw ? JSON.parse(raw) : [];
-        const updated = prev.map((i) => (i.id === id ? { ...i, checked } : i));
-        AsyncStorage.setItem('@nourish_guest_shopping', JSON.stringify(updated)).catch(() => {});
-      }).catch(() => {});
-      return;
-    }
+    if (!user) return;
 
     try {
       await supabase
@@ -779,14 +695,7 @@ export function useShoppingList() {
       return prev.filter((i) => i.id !== id);
     });
 
-    if (!user) {
-      AsyncStorage.getItem('@nourish_guest_shopping').then((raw) => {
-        const prev: ShoppingItem[] = raw ? JSON.parse(raw) : [];
-        const updated = prev.filter((i) => i.id !== id);
-        AsyncStorage.setItem('@nourish_guest_shopping', JSON.stringify(updated)).catch(() => {});
-      }).catch(() => {});
-      return;
-    }
+    if (!user) return;
 
     try {
       await supabase
@@ -805,11 +714,7 @@ export function useShoppingList() {
   const clearChecked = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      setItems((prev) => {
-        const updated = prev.filter((i) => !i.checked);
-        AsyncStorage.setItem('@nourish_guest_shopping', JSON.stringify(updated)).catch(() => {});
-        return updated;
-      });
+      setItems((prev) => prev.filter((i) => !i.checked));
       return;
     }
 
@@ -865,6 +770,8 @@ export function useMealPlan() {
 
   const add = useCallback(async (day_of_week: number, meal_type: string, recipe_name: string) => {
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const today = new Date();
     today.setDate(today.getDate() + day_of_week);
     const dateStr = today.toISOString().slice(0, 10);
@@ -879,14 +786,6 @@ export function useMealPlan() {
 
     // Optimistic addition
     setPlan((prev) => [...prev, tempEntry]);
-
-    if (!user) {
-      AsyncStorage.getItem('@nourish_guest_meal_plan').then((raw) => {
-        const prev = raw ? JSON.parse(raw) : [];
-        AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify([...prev, tempEntry])).catch(() => {});
-      }).catch(() => {});
-      return;
-    }
 
     try {
       const { data, error } = await supabase
@@ -919,13 +818,7 @@ export function useMealPlan() {
       return prev.filter((p) => p.id !== id);
     });
 
-    if (!user) {
-      AsyncStorage.getItem('@nourish_guest_meal_plan').then((raw) => {
-        const prev: MealPlanEntry[] = raw ? JSON.parse(raw) : [];
-        AsyncStorage.setItem('@nourish_guest_meal_plan', JSON.stringify(prev.filter((p) => p.id !== id))).catch(() => {});
-      }).catch(() => {});
-      return;
-    }
+    if (!user) return;
 
     try {
       await supabase

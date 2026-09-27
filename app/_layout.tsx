@@ -94,44 +94,43 @@ export default function RootLayout() {
   const segments = useSegments();
   const router   = useRouter();
 
-  // Auth listener — robust local & remote session synchronization
+  // Auth listener — strict server session synchronization (no guest bypass)
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (s) {
-          setSession(s);
-          await AsyncStorage.setItem('@nourish_session', JSON.stringify(s));
-        } else {
-          const local = await AsyncStorage.getItem('@nourish_session');
-          if (local) {
-            try {
-              setSession(JSON.parse(local));
-            } catch {}
+        const { data: { session: s }, error } = await supabase.auth.getSession();
+        if (s && !error && s.user) {
+          // Verify with Supabase auth service
+          const { data: { user }, error: userErr } = await supabase.auth.getUser();
+          if (user && !userErr) {
+            setSession(s);
+            await AsyncStorage.setItem('@nourish_session', JSON.stringify(s));
+          } else {
+            // Expired or revoked server session -> force clean state
+            setSession(null);
+            await AsyncStorage.removeItem('@nourish_session');
           }
+        } else {
+          // No active Supabase session
+          setSession(null);
+          await AsyncStorage.removeItem('@nourish_session');
         }
       } catch (err) {
-        const local = await AsyncStorage.getItem('@nourish_session');
-        if (local) {
-          try {
-            setSession(JSON.parse(local));
-          } catch {}
-        }
+        setSession(null);
+        await AsyncStorage.removeItem('@nourish_session');
       }
       setAuthInit(true);
     };
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
-      if (s) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
+      if (event === 'SIGNED_OUT' || !s) {
+        setSession(null);
+        await AsyncStorage.removeItem('@nourish_session');
+      } else if (s && s.user) {
         setSession(s);
-        AsyncStorage.setItem('@nourish_session', JSON.stringify(s)).catch(() => {});
+        await AsyncStorage.setItem('@nourish_session', JSON.stringify(s));
         registerPushToken().catch(() => {});
-      } else {
-        const local = await AsyncStorage.getItem('@nourish_session');
-        if (!local) {
-          setSession(null);
-        }
       }
     });
     return () => subscription.unsubscribe();
@@ -151,17 +150,17 @@ export default function RootLayout() {
 
     SplashScreen.hideAsync();
 
-    // Show opulent preloader on every app launch for high-end opening sequence
-    const timer = setTimeout(() => setAppReady(true), 1800);
+    const inAuthGroup = (segments[0] as string) === 'login' || (segments[0] as string) === 'reset-password';
 
-    // Mandatory Authentication Gating:
+    // Strict Authentication Gating:
     // Unauthenticated users are strictly routed to /login. No guest bypass allowed.
-    if (!session && segments[0] !== 'login') {
+    if (!session && !inAuthGroup) {
       router.replace('/login');
-    } else if (session && segments[0] === 'login') {
+    } else if (session && inAuthGroup) {
       router.replace('/(tabs)');
     }
 
+    const timer = setTimeout(() => setAppReady(true), 1200);
     return () => clearTimeout(timer);
   }, [session, authInitialized, segments, fontsLoaded, fontError]);
 
@@ -195,7 +194,7 @@ function AppContent() {
         <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style="dark" />
     </>
   );
 }
