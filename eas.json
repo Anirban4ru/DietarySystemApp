@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 7.0.0"
+    "version": ">= 14.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -12,7 +13,16 @@
       "distribution": "internal",
       "channel": "preview",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "resourceClass": "medium"
+      },
+      "cache": {
+        "key": "v2",
+        "paths": [
+          "node_modules",
+          ".gradle/caches",
+          ".gradle/wrapper"
+        ]
       }
     },
     "production": {

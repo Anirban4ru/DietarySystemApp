@@ -9,3 +9,4 @@ node_modules/
 .expo/
 dist/
 web-build/
+eas-inspect-out/
