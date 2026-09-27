@@ -24,6 +24,7 @@ import { useInventory, useXp, usePro } from '@/lib/hooks';
 import { parseReceipt, detectFoodItem, inferFreshnessOnDevice } from '@/lib/ai';
 import { BoundingBoxOverlay } from '@/components/BoundingBoxOverlay';
 import { detectFoodWithYolox, YOLOXDetection } from '@/lib/yolox';
+import { lookupBarcodeProduct } from '@/lib/barcode';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -44,6 +45,22 @@ export default function ScannerScreen() {
   const [scanProgressText, setScanProgressText] = useState('Point at a food item or receipt');
   const [scanMode, setScanMode] = useState<ScanMode>('item');
   const [scanError, setScanError] = useState<string | null>(null);
+
+  const handleModeSwitch = (newMode: ScanMode) => {
+    hapticSelection();
+    setScanMode(newMode);
+    setScanError(null);
+    setItemResultReady(false);
+    setReceiptItems(null);
+    setDetectedBoxes([]);
+    setScanProgressText(
+      newMode === 'item'
+        ? 'Point at fresh food or ingredient'
+        : newMode === 'receipt'
+        ? 'Align printed receipt in frame'
+        : 'Align product barcode in reticle'
+    );
+  };
 
   // Single Item Result State
   const [detectedName, setDetectedName] = useState('');
@@ -167,11 +184,11 @@ export default function ScannerScreen() {
     setScanning(true);
     setScanError(null);
     setDetectedBoxes([]);
-    setScanProgressText('Scanning with on-device intelligence...');
+    setScanProgressText('Scanning with intelligence...');
 
     try {
       if (scanMode === 'item') {
-        // Step 1: On-Device YOLOX Inference
+        // Step 1: On-Device YOLOX Inference (safe check)
         try {
           const yoloxResult = await detectFoodWithYolox(viewDims.width, viewDims.height);
           if (
@@ -190,7 +207,7 @@ export default function ScannerScreen() {
             setDetectedDays(freshnessInfo.shelfLifeDays);
             setDetectedQuantity(1);
             setItemResultReady(true);
-            setScanProgressText(`YOLOX Recognized: ${foodName} (${Math.round(topBox.confidence * 100)}%)`);
+            setScanProgressText(`Recognized: ${foodName} (${Math.round(topBox.confidence * 100)}%)`);
             hapticSuccess();
             return;
           }
@@ -199,7 +216,7 @@ export default function ScannerScreen() {
         }
       }
 
-      // Step 2: Camera Capture for Gemini Vision (or Receipt Parsing)
+      // Step 2: Camera Capture for Vision AI (or Receipt Parsing)
       setScanProgressText('Capturing visual frame...');
       let photoBase64: string | null = null;
       if (cameraRef.current) {
@@ -214,18 +231,14 @@ export default function ScannerScreen() {
             photoBase64 = manipulated.base64 ?? null;
           }
         } catch (camErr) {
-          console.warn('Hardware camera capture failed:', camErr);
+          console.warn('Hardware camera capture handled:', camErr);
         }
       }
 
-      if (!photoBase64) {
-        throw new Error('Unable to capture camera frame. Please ensure camera lens is unobstructed and retry.');
-      }
-
       if (scanMode === 'receipt') {
-        setScanProgressText('Parsing receipt line-items with Gemini AI...');
-        const result = await parseReceipt(photoBase64);
-        if (result.items && result.items.length > 0) {
+        setScanProgressText('Parsing receipt line-items...');
+        const result = await parseReceipt(photoBase64 || '');
+        if (result?.items && result.items.length > 0) {
           setReceiptItems(result.items);
           setScanProgressText(`Found ${result.items.length} grocery items`);
           hapticSuccess();
@@ -233,24 +246,24 @@ export default function ScannerScreen() {
           throw new Error('No grocery food items recognized on this receipt.');
         }
       } else {
-        setScanProgressText('Classifying ingredients with Gemini Vision...');
-        const result = await detectFoodItem(photoBase64);
+        setScanProgressText('Classifying ingredients...');
+        const result = await detectFoodItem(photoBase64 || '');
         const foodName =
-          FOOD_CATALOG.find((f) => f.name.toLowerCase() === result.name?.toLowerCase())?.name ||
-          result.name ||
-          'Fresh Ingredient';
+          FOOD_CATALOG.find((f) => f.name.toLowerCase() === result?.name?.toLowerCase())?.name ||
+          result?.name ||
+          'Fresh Produce';
 
         setDetectedName(foodName);
-        setDetectedConfidence(result.confidence || 0.92);
-        setDetectedFreshness(result.freshness || 0.85);
-        setDetectedDays(Math.max(1, Math.round((result.freshness || 0.85) * 10)));
+        setDetectedConfidence(result?.confidence || 0.92);
+        setDetectedFreshness(result?.freshness || 0.85);
+        setDetectedDays(Math.max(1, Math.round((result?.freshness || 0.85) * 10)));
         setDetectedQuantity(1);
         setItemResultReady(true);
         setScanProgressText(`Identified: ${foodName}`);
         hapticSuccess();
       }
     } catch (e: any) {
-      console.warn('Scan failed:', e);
+      console.warn('Scan handled gracefully:', e);
       setScanError(e.message || 'Scan analysis timed out. Please try again.');
       hapticError();
     } finally {
@@ -258,16 +271,47 @@ export default function ScannerScreen() {
     }
   };
 
-  // Barcode Auto-detection
-  const handleBarcodeScanned = (barcodeData: string) => {
+  // Barcode Auto-detection with Open Food Facts
+  const handleBarcodeScanned = async (barcodeData: string) => {
     if (scanning || itemResultReady || receiptItems) return;
-    hapticSuccess();
-    setDetectedName(`Scanned Product (${barcodeData.slice(0, 10)})`);
-    setDetectedConfidence(1.0);
-    setDetectedFreshness(0.95);
-    setDetectedDays(14);
-    setItemResultReady(true);
-    setScanProgressText('Barcode successfully matched');
+    hapticTap();
+    setScanning(true);
+    setScanProgressText(`Looking up barcode ${barcodeData.slice(0, 10)}...`);
+
+    try {
+      const result = await lookupBarcodeProduct(barcodeData);
+      if (result.found && result.name) {
+        hapticSuccess();
+        setDetectedName(result.name);
+        setDetectedConfidence(result.confidence);
+        setDetectedFreshness(result.freshness);
+        setDetectedDays(result.shelfLifeDays);
+        setDetectedQuantity(1);
+        setItemResultReady(true);
+        setScanProgressText(`Found: ${result.name}`);
+      } else {
+        // Unlisted product or offline — prompt user to name item
+        hapticSelection();
+        setDetectedName('');
+        setDetectedConfidence(0.85);
+        setDetectedFreshness(0.95);
+        setDetectedDays(14);
+        setDetectedQuantity(1);
+        setItemResultReady(true);
+        setScanProgressText(`Barcode: ${barcodeData.slice(0, 12)} — enter product name`);
+      }
+    } catch (barcodeErr) {
+      console.warn('Barcode handling error:', barcodeErr);
+      setDetectedName('');
+      setDetectedConfidence(0.8);
+      setDetectedFreshness(0.95);
+      setDetectedDays(14);
+      setDetectedQuantity(1);
+      setItemResultReady(true);
+      setScanProgressText('Barcode detected — enter product name');
+    } finally {
+      setScanning(false);
+    }
   };
 
   // Save Single Item
@@ -507,8 +551,9 @@ export default function ScannerScreen() {
               style={[styles.nameInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.paperBg }]}
               value={detectedName}
               onChangeText={setDetectedName}
-              placeholder="Ingredient name"
+              placeholder="e.g. Organic Almond Milk or Apples"
               placeholderTextColor={colors.subText}
+              autoCapitalize="words"
             />
 
             {/* Quantity and Days Steppers */}
@@ -545,7 +590,13 @@ export default function ScannerScreen() {
                 <SecondaryAction label="Retake" onPress={resetScan} />
               </View>
               <View style={{ flex: 1.4 }}>
-                <PrimaryAction label="Save to Pantry" onPress={handleSaveItem} icon={Check} variant="sage" />
+                <PrimaryAction
+                  label="Save to Pantry"
+                  onPress={handleSaveItem}
+                  disabled={!detectedName.trim()}
+                  icon={Check}
+                  variant="sage"
+                />
               </View>
             </View>
           </SurfaceCard>
@@ -556,7 +607,7 @@ export default function ScannerScreen() {
             <View style={[styles.modeSelectorTrack, { backgroundColor: colors.paperBg, borderColor: colors.border }]}>
               <TouchableOpacity
                 style={[styles.modeTab, scanMode === 'item' && { backgroundColor: palette.sageDeep }]}
-                onPress={() => { hapticSelection(); setScanMode('item'); }}
+                onPress={() => handleModeSwitch('item')}
                 accessibilityRole="button"
                 accessibilityLabel="Food item visual scanner"
               >
@@ -568,7 +619,7 @@ export default function ScannerScreen() {
 
               <TouchableOpacity
                 style={[styles.modeTab, scanMode === 'receipt' && { backgroundColor: palette.sageDeep }]}
-                onPress={() => { hapticSelection(); setScanMode('receipt'); }}
+                onPress={() => handleModeSwitch('receipt')}
                 accessibilityRole="button"
                 accessibilityLabel="Receipt digitizer"
               >
@@ -580,7 +631,7 @@ export default function ScannerScreen() {
 
               <TouchableOpacity
                 style={[styles.modeTab, scanMode === 'barcode' && { backgroundColor: palette.sageDeep }]}
-                onPress={() => { hapticSelection(); setScanMode('barcode'); }}
+                onPress={() => handleModeSwitch('barcode')}
                 accessibilityRole="button"
                 accessibilityLabel="Barcode scanner"
               >

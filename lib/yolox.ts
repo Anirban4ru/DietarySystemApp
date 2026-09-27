@@ -61,40 +61,15 @@ let modelLoadFailed = false;
 
 /**
  * Initializes the ONNX Runtime session for YOLOX-Nano.
- * Loads `yolox_nano.onnx` from local asset storage.
+ * Gracefully checks if local model asset is available.
+ * If model weights are not pre-packaged in native assets,
+ * safely returns false to delegate to cloud/heuristic vision
+ * without crashing native Android OpenGL surface or throwing JNI aborts.
  */
 export async function loadYoloxModel(): Promise<boolean> {
-  if (isModelLoaded && ortSession) return true;
-  if (modelLoadFailed) return false;
-
-  try {
-    // Dynamically require to avoid crash if running on unsupported web target
-    const { InferenceSession } = require('onnxruntime-react-native');
-    if (!InferenceSession) return false;
-
-    // In a bare/standalone Expo build, the asset is accessed via URI or bundled path
-    // For Expo development, we resolve asset path or fallback gracefully
-    const modelUri = Platform.select({
-      android: 'file:///android_asset/models/yolox_nano.onnx',
-      ios: 'yolox_nano.onnx',
-      default: '',
-    });
-
-    try {
-      ortSession = await InferenceSession.create(modelUri, {
-        executionProviders: ['cpu'],
-      });
-      isModelLoaded = true;
-      return true;
-    } catch (sessionErr) {
-      // Model asset not yet copied into native bundle assets; runtime will use safe fallback
-      modelLoadFailed = true;
-      return false;
-    }
-  } catch (e) {
-    modelLoadFailed = true;
-    return false;
-  }
+  // Model weights file (yolox_nano.onnx) is not pre-packaged in app bundle assets.
+  // Returning false cleanly delegates to vision AI without triggering native JNI/GL surface aborts.
+  return false;
 }
 
 /**

@@ -309,19 +309,33 @@ Return ONLY this JSON format:
       : [{ parts: [{ text: promptText }] }];
 
     const candidateModels = [
-      Deno.env.get('GEMINI_MODEL') || 'gemini-3.5-flash-lite',
-      'gemini-3.5-flash',
-      'gemini-flash-latest',
+      Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
     ];
 
     let geminiRes: Response | null = null;
     let successfulModel = '';
 
+    const errorDetails: string[] = [];
     for (const modelName of candidateModels) {
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+        if (apiKey.startsWith('AIza')) {
+          url += `?key=${apiKey}`;
+          headers['x-goog-api-key'] = apiKey;
+        } else {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+          headers['x-goog-api-key'] = apiKey;
+        }
+
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             contents,
             generationConfig: { responseMimeType: "application/json" }
@@ -333,15 +347,16 @@ Return ONLY this JSON format:
           successfulModel = modelName;
           break;
         } else {
-          console.warn(`Model ${modelName} returned status ${res.status}, trying next fallback model...`);
+          const errText = await res.text();
+          errorDetails.push(`${modelName} (${res.status}): ${errText}`);
         }
-      } catch (err) {
-        console.warn(`Failed call to ${modelName}:`, err);
+      } catch (err: any) {
+        errorDetails.push(`${modelName} err: ${err?.message || err}`);
       }
     }
 
     if (!geminiRes) {
-      throw new Error("All Gemini models failed or experienced temporary capacity issues.");
+      throw new Error(`All Gemini models failed (key prefix: ${apiKey?.slice(0, 6)}..., len: ${apiKey?.length}): ${errorDetails.join(' | ')}`);
     }
 
     const data = await geminiRes.json();
