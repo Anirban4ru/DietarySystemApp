@@ -13,15 +13,7 @@
 [![Expo](https://img.shields.io/badge/Expo-SDK%2054%20(Managed)-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9%20(Strict)-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/Supabase-PostgreSQL%2015%20%2B%20RLS-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
-[![License](https://img.shields.io/badge/License-Proprietary%20%7C%20No%20Cloning-7F1100?style=for-the-badge&logo=shield&logoColor=white)](./LICENSE)
-[![Copyright](https://img.shields.io/badge/%C2%A9%202026-Anirban%20Chatterjee-02332D?style=for-the-badge&logoColor=white)](#-copyright--ownership)
-
-<br />
-
-**Copyright © 2026 Anirban Chatterjee. All Rights Reserved.**  
-*Proprietary software protected by international copyright law. Unauthorized copying, cloning, distribution, or reproduction is strictly prohibited.*
-
-<br />
+[![License](https://img.shields.io/badge/License-Proprietary-7F1100?style=for-the-badge&logo=shield&logoColor=white)](./LICENSE)
 
 > ⏱️ **Engineering Provenance**: Architected, developed, and tested over **8+ months of intensive full-stack mobile systems engineering**, synthesizing clinical dietetics literature, cryptographic multi-tenant data isolation, native camera/vision hardware pipelines, and 120 FPS deterministic UI engineering.
 
@@ -203,20 +195,11 @@ Nourish enforces a normalized, highly performant relational architecture managed
 
 ## 🔒 Copyright & Ownership
 
-<a id="copyright--ownership"></a>
+**Copyright © 2026 Anirban Chatterjee. All Rights Reserved.**
 
-> [!CAUTION]
-> ### 🛑 COPYRIGHT © 2026 ANIRBAN CHATTERJEE — ALL RIGHTS RESERVED
-> **Proprietary Source Code & System Intellectual Property**  
-> This entire codebase, clinical nutrition algorithms, system architecture, database schemas, and custom UI designs are the exclusive proprietary intellectual property of **Anirban Chatterjee**.  
-> Unauthorized copying, cloning, downloading, mirroring, reproduction, distribution, or ingestion into AI models is strictly prohibited under international copyright law.
+This codebase, clinical nutrition algorithms, system architecture, database schemas, and custom UI designs represent the proprietary intellectual property of **Anirban Chatterjee**. Unauthorized copying, cloning, distribution, or reproduction is strictly prohibited under international copyright law.
 
-### © Copyright & Intellectual Property Protection
-* **Copyright Holder**: **Anirban Chatterjee**
-* **Year of Creation**: **© 2026**
-* **Engineering Provenance**: 8+ months of intensive full-stack mobile systems engineering, clinical dietetics logic, and hardware camera telemetry.
-* **Protected Scope**: Covers all source code (`/src`, `/supabase`), algorithmic engines, database schemas, security policies, documentation, and digital assets.
-* **License & Anti-Cloning Agreement**: Full legal licensing terms, anti-cloning provisions, and enforcement notices are maintained separately in the repository [**LICENSE**](./LICENSE) (accessible via the **[⚖️ License]** tab at the top of the repository).
+For full legal terms, see the standalone [**LICENSE**](./LICENSE) file or the **[⚖️ License]** tab at the top of the repository.
 
 ---
 
@@ -232,8 +215,5 @@ Nourish enforces a normalized, highly performant relational architecture managed
 <br />
 
 <div align="center">
-  <p><b>Copyright © 2026 Anirban Chatterjee. All Rights Reserved.</b></p>
   <sub>Built with uncompromising clinical rigor, mathematical elegance, and elite software engineering standards.</sub>
-  <br />
-  <small>Unauthorized copying, reproduction, cloning, or redistribution is strictly prohibited. See <a href="./LICENSE">LICENSE</a>.</small>
 </div>
