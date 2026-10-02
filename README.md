@@ -198,6 +198,26 @@ Nourish enforces a normalized, highly performant relational architecture managed
 
 ## 🔒 Proprietary License & Strict Anti-Cloning Agreement
 
+> [!CAUTION]
+> ### 🛑 PROPRIETARY SOURCE CODE — STRICT NO-CLONING & NO-COPY NOTICE
+> **Copyright © 2026 Anirban Chatterjee. All Rights Reserved.**  
+> This repository, including all clinical nutrition algorithms, system architecture, and proprietary UI designs, is provided **strictly for portfolio evaluation and technical recruitment review**. Unauthorized copying, cloning, mirroring, downloading, forking, redistribution, commercialization, or training of AI models is strictly prohibited. See the [full license terms below](#-proprietary-license--strict-anti-cloning-agreement) or the [LICENSE](./LICENSE) file.
+
+### 1. Reservation of All Exclusive Rights
+All title, ownership rights, intellectual property rights, algorithms (including the **Mifflin-St Jeor clinical dietetics engine**, **Nutritional Decay Scale**, and **Heuristic Substitution solver**), architecture designs, and digital assets remain solely and exclusively with **Anirban Chatterjee**. No title or ownership of any kind is granted or transferred.
+
+### 2. Strict Prohibition on Copying, Cloning & Mirroring
+Under international copyright treaties and civil statutes:
+* **No Cloning or Forking**: You may **NOT** copy, clone, download, reproduce, mirror, duplicate, or fork this repository or any portion thereof, in whole or in part, in any physical, digital, or cloud-based environment.
+* **No Reverse Engineering**: You may **NOT** decompile, reverse engineer, disassemble, or attempt to derive the architecture or source code of any component of this application.
+* **No Commercial Exploitation**: You may **NOT** sell, license, sublicense, lease, host, deploy, or utilize this software for any commercial product, software-as-a-service (SaaS), or enterprise deployment.
+
+### 3. Strict Machine Learning & AI Training Ban
+Explicit permission is **DENIED** for this repository, code, or documentation to be ingested, scraped, crawled, or utilized as training data or fine-tuning datasets for any machine learning models, artificial intelligence systems, or code generation tools.
+
+### 4. Permitted Use (Technical Evaluation & Recruitment Only)
+Permission is granted **strictly and exclusively** to prospective employers, hiring managers, engineering recruiters, and technical assessment panels to inspect and review the source code in a private, read-only capacity solely for the purpose of assessing the professional qualifications and engineering capabilities of **Anirban Chatterjee**.
+
 ```
 ================================================================================
           PROPRIETARY SOURCE CODE & ASSET NOTICE — ALL RIGHTS RESERVED
