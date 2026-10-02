@@ -13,8 +13,13 @@
 [![Expo](https://img.shields.io/badge/Expo-SDK%2054%20(Managed)-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9%20(Strict)-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/Supabase-PostgreSQL%2015%20%2B%20RLS-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
-[![License](https://img.shields.io/badge/License-Proprietary%20%7C%20No%20Cloning-7F1100?style=for-the-badge&logo=shield&logoColor=white)](#-proprietary-license--strict-anti-cloning-agreement)
-[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20Ready-02332D?style=for-the-badge&logo=android&logoColor=white)](https://expo.dev/eas)
+[![License](https://img.shields.io/badge/License-Proprietary%20%7C%20No%20Cloning-7F1100?style=for-the-badge&logo=shield&logoColor=white)](./LICENSE)
+[![Copyright](https://img.shields.io/badge/%C2%A9%202026-Anirban%20Chatterjee-02332D?style=for-the-badge&logoColor=white)](#-copyright--ownership)
+
+<br />
+
+**Copyright © 2026 Anirban Chatterjee. All Rights Reserved.**  
+*Proprietary software protected by international copyright law. Unauthorized copying, cloning, distribution, or reproduction is strictly prohibited.*
 
 <br />
 
@@ -38,7 +43,7 @@
 5. [Database Schema & Entity Relational Topology](#-database-schema--entity-relational-topology)
 6. [Engineering Metrics, Reliability & Benchmarks](#-engineering-metrics-reliability--benchmarks)
 7. [Technology Stack & Infrastructure](#-technology-stack--infrastructure)
-8. [Proprietary License & Strict Anti-Cloning Agreement](#-proprietary-license--strict-anti-cloning-agreement)
+8. [Copyright & Ownership](#-copyright--ownership)
 9. [Author & Engineering Contact](#-author--engineering-contact)
 
 ---
@@ -196,64 +201,22 @@ Nourish enforces a normalized, highly performant relational architecture managed
 
 ---
 
-## 🔒 Proprietary License & Strict Anti-Cloning Agreement
+## 🔒 Copyright & Ownership
+
+<a id="copyright--ownership"></a>
 
 > [!CAUTION]
-> ### 🛑 PROPRIETARY SOURCE CODE — STRICT NO-CLONING & NO-COPY NOTICE
-> **Copyright © 2026 Anirban Chatterjee. All Rights Reserved.**  
-> This repository, including all clinical nutrition algorithms, system architecture, and proprietary UI designs, is provided **strictly for portfolio evaluation and technical recruitment review**. Unauthorized copying, cloning, mirroring, downloading, forking, redistribution, commercialization, or training of AI models is strictly prohibited. See the [full license terms below](#-proprietary-license--strict-anti-cloning-agreement) or the [LICENSE](./LICENSE) file.
+> ### 🛑 COPYRIGHT © 2026 ANIRBAN CHATTERJEE — ALL RIGHTS RESERVED
+> **Proprietary Source Code & System Intellectual Property**  
+> This entire codebase, clinical nutrition algorithms, system architecture, database schemas, and custom UI designs are the exclusive proprietary intellectual property of **Anirban Chatterjee**.  
+> Unauthorized copying, cloning, downloading, mirroring, reproduction, distribution, or ingestion into AI models is strictly prohibited under international copyright law.
 
-### 1. Reservation of All Exclusive Rights
-All title, ownership rights, intellectual property rights, algorithms (including the **Mifflin-St Jeor clinical dietetics engine**, **Nutritional Decay Scale**, and **Heuristic Substitution solver**), architecture designs, and digital assets remain solely and exclusively with **Anirban Chatterjee**. No title or ownership of any kind is granted or transferred.
-
-### 2. Strict Prohibition on Copying, Cloning & Mirroring
-Under international copyright treaties and civil statutes:
-* **No Cloning or Forking**: You may **NOT** copy, clone, download, reproduce, mirror, duplicate, or fork this repository or any portion thereof, in whole or in part, in any physical, digital, or cloud-based environment.
-* **No Reverse Engineering**: You may **NOT** decompile, reverse engineer, disassemble, or attempt to derive the architecture or source code of any component of this application.
-* **No Commercial Exploitation**: You may **NOT** sell, license, sublicense, lease, host, deploy, or utilize this software for any commercial product, software-as-a-service (SaaS), or enterprise deployment.
-
-### 3. Strict Machine Learning & AI Training Ban
-Explicit permission is **DENIED** for this repository, code, or documentation to be ingested, scraped, crawled, or utilized as training data or fine-tuning datasets for any machine learning models, artificial intelligence systems, or code generation tools.
-
-### 4. Permitted Use (Technical Evaluation & Recruitment Only)
-Permission is granted **strictly and exclusively** to prospective employers, hiring managers, engineering recruiters, and technical assessment panels to inspect and review the source code in a private, read-only capacity solely for the purpose of assessing the professional qualifications and engineering capabilities of **Anirban Chatterjee**.
-
-```
-================================================================================
-          PROPRIETARY SOURCE CODE & ASSET NOTICE — ALL RIGHTS RESERVED
-================================================================================
-Copyright (c) 2026 Anirban Chatterjee. All rights reserved.
-
-NOTICE: This codebase, including all source code, software architecture, clinical
-algorithms, mathematical decay models, heuristic substitution engines, design
-tokens, and digital assets, represents the exclusive proprietary intellectual
-property of Anirban Chatterjee ("Owner").
-
-1. STRICT PROHIBITION ON COPYING AND CLONING:
-   No person or entity may copy, clone, reproduce, mirror, duplicate, fork,
-   transcribe, translate, or store this software or any portion thereof, in whole
-   or in part, in any physical, digital, or cloud-based retrieval system.
-
-2. PROHIBITION ON REDISTRIBUTION & COMMERCIAL EXPLOITATION:
-   Redistribution, public hosting, re-licensing, sublicensing, selling, leasing,
-   commercial deployment, software-as-a-service (SaaS) utilization, or creation
-   of derivative works based on this software is strictly prohibited under
-   international copyright treaties and civil statutes.
-
-3. PROHIBITION ON MACHINE LEARNING & AI INGESTION:
-   Explicit permission is DENIED for this repository, code, or documentation to be
-   used as training data, fine-tuning corpora, or input for any machine learning
-   models, generative artificial intelligence systems, or algorithmic parsers.
-
-4. PERMITTED USE (EVALUATION ONLY):
-   Permission is granted exclusively to prospective employers, recruiters, and
-   technical evaluation committees to inspect the source code in a read-only
-   capacity solely for the purpose of assessing the professional qualifications
-   and engineering capabilities of Anirban Chatterjee.
-
-VIOLATORS WILL BE PROSECUTED TO THE MAXIMUM EXTENT PERMITTED BY LAW.
-================================================================================
-```
+### © Copyright & Intellectual Property Protection
+* **Copyright Holder**: **Anirban Chatterjee**
+* **Year of Creation**: **© 2026**
+* **Engineering Provenance**: 8+ months of intensive full-stack mobile systems engineering, clinical dietetics logic, and hardware camera telemetry.
+* **Protected Scope**: Covers all source code (`/src`, `/supabase`), algorithmic engines, database schemas, security policies, documentation, and digital assets.
+* **License & Anti-Cloning Agreement**: Full legal licensing terms, anti-cloning provisions, and enforcement notices are maintained separately in the repository [**LICENSE**](./LICENSE) (accessible via the **[⚖️ License]** tab at the top of the repository).
 
 ---
 
@@ -269,5 +232,8 @@ VIOLATORS WILL BE PROSECUTED TO THE MAXIMUM EXTENT PERMITTED BY LAW.
 <br />
 
 <div align="center">
+  <p><b>Copyright © 2026 Anirban Chatterjee. All Rights Reserved.</b></p>
   <sub>Built with uncompromising clinical rigor, mathematical elegance, and elite software engineering standards.</sub>
+  <br />
+  <small>Unauthorized copying, reproduction, cloning, or redistribution is strictly prohibited. See <a href="./LICENSE">LICENSE</a>.</small>
 </div>
